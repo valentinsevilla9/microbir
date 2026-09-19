@@ -28,16 +28,18 @@ export async function guardarFlashcardGenerada(pregunta: string, respuesta: stri
     return { success: false, error: "No autorizado" };
   }
 
-  // La guardamos en la tabla actual de flashcards (algoritmo SM-2 en 0)
-  const { error } = await supabase.from("flashcards").insert({
+  // La guardamos en la tabla actual de flashcards
+  const insertPayload: any = {
     user_id: user.id,
-    pregunta,
-    respuesta,
-    asignatura, // Asumimos que podemos pasar la asignatura
+    frente: pregunta, // Se mapea 'pregunta' a 'frente'
+    dorso: respuesta, // Se mapea 'respuesta' a 'dorso'
+    asignatura: asignatura,
     intervalo: 0,
     repeticiones: 0,
     facilidad: 2.5
-  });
+  };
+
+  const { error } = await supabase.from("flashcards").insert(insertPayload);
 
   if (error) {
     return { success: false, error: error.message };

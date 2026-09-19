@@ -119,7 +119,7 @@ export default function RadarChart({ data, size = 320 }: RadarChartProps) {
           const { x, y } = getCoordinates(1.2, i); 
           
           // Ajustes finos de alineación según el cuadrante
-          let textAnchor = "middle";
+          let textAnchor: "middle" | "start" | "end" = "middle";
           if (x > center + 10) textAnchor = "start";
           if (x < center - 10) textAnchor = "end";
 
