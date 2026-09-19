@@ -1,0 +1,111 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── TEMA CLARO ──────────────────────────────────── */
+:root {
+  --background:          220 20%  97%;
+  --foreground:          224 30%  10%;
+
+  --card:                0   0%  100%;
+  --card-foreground:     224 30%  10%;
+
+  --primary:             248 80%  60%;
+  --primary-foreground:  0   0%  100%;
+
+  --muted:               220 15%  92%;
+  --muted-foreground:    220 12%  46%;
+
+  --accent:              248 40%  94%;
+
+  --border:              220 15%  88%;
+
+  --destructive:         0   72%  56%;
+  --destructive-foreground: 0 0% 100%;
+
+  --success:             142 72%  40%;
+  --warning:             38  90%  50%;
+
+  --ring:                248 80%  60%;
+
+  --radius: 0.75rem;
+}
+
+/* ─── TEMA OSCURO ─────────────────────────────────── */
+.dark {
+  --background:          224 30%   8%;
+  --foreground:          220 20%  92%;
+
+  --card:                224 28%  11%;
+  --card-foreground:     220 20%  92%;
+
+  --primary:             248 80%  65%;
+  --primary-foreground:  0   0%  100%;
+
+  --muted:               224 22%  16%;
+  --muted-foreground:    220 14%  58%;
+
+  --accent:              248 30%  18%;
+
+  --border:              224 22%  18%;
+
+  --destructive:         0   65%  55%;
+  --destructive-foreground: 0 0% 100%;
+
+  --success:             142 60%  45%;
+  --warning:             38  85%  55%;
+
+  --ring:                248 80%  65%;
+}
+
+/* ─── BASE ────────────────────────────────────────── */
+html {
+  background: hsl(var(--background));
+  font-family: "Inter", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+/* ─── SCROLLBAR DARK ──────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 9999px;
+}
+
+/* ─── UTILIDADES EXTRA ────────────────────────────── */
+.glass {
+  background: hsl(var(--card) / 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid hsl(var(--border) / 0.6);
+}
+
+.glow-primary {
+  box-shadow: 0 0 20px hsl(var(--primary) / 0.25);
+}
+
+/* Animación suave para tarjetas */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up {
+  animation: fadeInUp 0.35s ease both;
+}
