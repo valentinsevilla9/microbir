@@ -74,8 +74,12 @@ export default function VisorApuntes() {
     setFlashcardDraft(null);
 
     try {
-      const draft = await processTextToFlashcard(selectedText);
-      setFlashcardDraft(draft);
+      const response = await processTextToFlashcard(selectedText);
+      if (response.success && response.data) {
+        setFlashcardDraft(response.data);
+      } else {
+        throw new Error(response.error);
+      }
     } catch (error) {
       console.error(error);
       alert("Error al generar la flashcard. Revisa tu API KEY en .env.local y Vercel.");
@@ -87,7 +91,8 @@ export default function VisorApuntes() {
   const handleGuardar = async () => {
     if (!flashcardDraft) return;
     try {
-      await guardarFlashcardGenerada(flashcardDraft, "General"); // TODO: Selector de tema real
+      // guardarFlashcardGenerada espera (pregunta, respuesta, asignatura)
+      await guardarFlashcardGenerada(flashcardDraft.pregunta, flashcardDraft.respuesta, "General"); 
       setPanelAbierto(false);
       alert("Flashcard guardada con éxito en tu mazo!");
     } catch (error) {
