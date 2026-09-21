@@ -5,10 +5,12 @@ import { usePathname } from "next/navigation";
 import { useTheme } from "./ThemeProvider";
 
 import { enlaces } from "./nav-links";
+import { usePomodoro } from "@/components/pomodoro/PomodoroProvider";
 
 export default function Sidebar() {
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
+  const { toggleVisibility } = usePomodoro();
 
   return (
     <aside className="hidden w-64 shrink-0 border-r border-border bg-card md:block">
@@ -31,35 +33,45 @@ export default function Sidebar() {
           </div>
         </Link>
 
-        {/* NAV */}
-        <nav className="mt-8 flex-1 space-y-1">
-          {enlaces.map((enlace) => {
-            const activo =
-              pathname === enlace.href ||
-              (enlace.href !== "/dashboard" &&
-                pathname.startsWith(enlace.href));
+        {/* NAVEGACIÓN */}
+        <nav className="mt-8 flex flex-1 flex-col gap-1.5">
+          {enlaces.map((link) => {
+            if (link.href === "#pomodoro") {
+              return (
+                <button
+                  key={link.href}
+                  onClick={toggleVisibility}
+                  className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-all hover:bg-accent hover:text-foreground w-full text-left"
+                >
+                  <div className="text-muted-foreground">
+                    {link.icon}
+                  </div>
+                  {link.label}
+                </button>
+              );
+            }
+
+            const isActive =
+              pathname === link.href ||
+              (link.href !== "/dashboard" &&
+                pathname.startsWith(link.href));
 
             return (
               <Link
-                key={enlace.href}
-                href={enlace.href}
-                className={[
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
-                  activo
+                key={link.href}
+                href={link.href}
+                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
+                  isActive
                     ? "bg-primary/10 text-primary shadow-sm"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground",
-                ].join(" ")}
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                }`}
               >
-                <span
-                  className={
-                    activo ? "text-primary" : "text-muted-foreground"
-                  }
-                >
-                  {enlace.icon}
-                </span>
-                {enlace.label}
+                <div className={`${isActive ? "text-primary" : "text-muted-foreground"}`}>
+                  {link.icon}
+                </div>
+                {link.label}
 
-                {activo && (
+                {isActive && (
                   <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary" />
                 )}
               </Link>
