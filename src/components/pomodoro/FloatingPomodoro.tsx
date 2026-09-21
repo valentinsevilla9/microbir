@@ -34,7 +34,7 @@ export default function FloatingPomodoro() {
   } = usePomodoro();
 
   // Estados para el sistema de arrastre (drag) manual
-  const [position, setPosition] = useState({ x: window.innerWidth - 300, y: window.innerHeight - 250 });
+  const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   
