@@ -4,23 +4,24 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ─── TEMA CLARO ──────────────────────────────────── */
+/* ☀️ TEMA CLARO (Totorito Base) */
 :root {
-  --background:          220 20%  97%;
-  --foreground:          224 30%  10%;
+  --background:          210 20%  98%;
+  --foreground:          222 47%  11%; /* Azul contorno Totorito oscuro */
 
   --card:                0   0%  100%;
-  --card-foreground:     224 30%  10%;
+  --card-foreground:     222 47%  11%;
 
-  --primary:             248 80%  60%;
+  /* Azul vibrante del cuerpo de Totorito */
+  --primary:             212 90%  53%;
   --primary-foreground:  0   0%  100%;
 
-  --muted:               220 15%  92%;
-  --muted-foreground:    220 12%  46%;
+  --muted:               210 20%  94%;
+  --muted-foreground:    215 16%  47%;
 
-  --accent:              248 40%  94%;
+  --accent:              212 90%  95%; /* Azulito claro */
 
-  --border:              220 15%  88%;
+  --border:              214 32%  91%;
 
   --destructive:         0   72%  56%;
   --destructive-foreground: 0 0% 100%;
@@ -28,36 +29,54 @@
   --success:             142 72%  40%;
   --warning:             38  90%  50%;
 
-  --ring:                248 80%  60%;
+  --ring:                212 90%  53%;
 
   --radius: 0.75rem;
 }
 
-/* ─── TEMA OSCURO ─────────────────────────────────── */
+/* 🌙 TEMA OSCURO (Totorito Abisal) */
 .dark {
-  --background:          224 30%   8%;
-  --foreground:          220 20%  92%;
+  --background:          222 47%   8%; /* Azul marino ultra oscuro */
+  --foreground:          210 20%  92%;
 
-  --card:                224 28%  11%;
-  --card-foreground:     220 20%  92%;
+  --card:                222 47%  11%;
+  --card-foreground:     210 20%  92%;
 
-  --primary:             248 80%  65%;
+  /* En modo oscuro el primario brilla un poco más (Highlight de Totorito) */
+  --primary:             210 100% 60%;
   --primary-foreground:  0   0%  100%;
 
-  --muted:               224 22%  16%;
-  --muted-foreground:    220 14%  58%;
+  --muted:               222 47%  15%;
+  --muted-foreground:    215 20%  65%;
 
-  --accent:              248 30%  18%;
+  --accent:              212 47%  18%;
 
-  --border:              224 22%  18%;
+  --border:              222 47%  18%;
 
-  --destructive:         0   65%  55%;
+  --destructive:         0   62%  50%;
   --destructive-foreground: 0 0% 100%;
 
-  --success:             142 60%  45%;
-  --warning:             38  85%  55%;
+  --success:             142 60%  35%;
+  --warning:             38  80%  45%;
 
-  --ring:                248 80%  65%;
+  --ring:                210 100% 60%;
+}
+
+@layer utilities {
+  /* Utilidad mágica para que las imágenes pixel art mantengan su nitidez al escalar */
+  .pixel-art {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+  
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-8px); }
+  }
+  
+  .animate-float {
+    animation: float 4s ease-in-out infinite;
+  }
 }
 
 /* ─── BASE ────────────────────────────────────────── */

@@ -195,12 +195,34 @@ export default async function DashboardPage() {
     <div className="space-y-8 animate-fade-in-up">
       {/* HEADER */}
       <header className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-sm text-muted-foreground">Bienvenida de vuelta,</p>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight capitalize">
-            {nombre} 👋
-          </h1>
-          <p className="mt-1.5 text-sm text-muted-foreground">¿Qué practicamos hoy?</p>
+        <div className="flex items-center gap-6">
+          <div className="relative w-24 h-24 sm:w-28 sm:h-28 flex-shrink-0 animate-float hidden sm:block">
+            {/* Totorito en escritorio */}
+            <img 
+              src="/images/totorito.png" 
+              alt="Totorito Mascota" 
+              className="pixel-art drop-shadow-2xl absolute inset-0 w-full h-full object-contain"
+            />
+          </div>
+          <div>
+            <div className="flex items-center gap-3">
+              <div className="relative w-12 h-12 flex-shrink-0 animate-float sm:hidden">
+                {/* Totorito en mvil (ms pequeo) */}
+                <img 
+                  src="/images/totorito.png" 
+                  alt="Totorito" 
+                  className="pixel-art drop-shadow-xl absolute inset-0 w-full h-full object-contain"
+                />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Bienvenida de vuelta,</p>
+                <h1 className="mt-1 text-3xl sm:text-4xl font-bold tracking-tight capitalize text-primary">
+                  {nombre}
+                </h1>
+              </div>
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">¿Qué practicamos hoy? ¡Modo criptobiosis activado!</p>
+          </div>
         </div>
 
         <form action={logout}>
