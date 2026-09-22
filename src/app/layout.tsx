@@ -3,13 +3,12 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 import PwaRegistry from "@/components/layout/PwaRegistry";
+import { SCRIPT_TEMA, ThemeProvider } from "@/components/layout/ThemeProvider";
 
 export const viewport: Viewport = {
   themeColor: "#0ea5e9",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
 };
 
 export const metadata: Metadata = {
@@ -34,9 +33,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className="dark" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: SCRIPT_TEMA }} />
+      </head>
       <body className="min-h-screen bg-background text-foreground antialiased">
         <PwaRegistry />
-        {children}
+        <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
   );

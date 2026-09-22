@@ -17,19 +17,30 @@ interface Props {
   onTerminado: () => void;
 }
 
+/*
+ * Calidades SM-2. "Difícil" es una respuesta CORRECTA con esfuerzo (3): antes
+ * valía 2, que en SM-2 es un fallo y devolvía la tarjeta a 1 día.
+ */
 const BOTONES_CALIDAD = [
-  { calidad: 0, label: "Nada", color: "bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20" },
-  { calidad: 2, label: "Difícil", color: "bg-orange-500/10 text-orange-400 border-orange-500/20 hover:bg-orange-500/20" },
-  { calidad: 3, label: "Bien", color: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20 hover:bg-yellow-500/20" },
+  { calidad: 1, label: "Otra vez", color: "bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20" },
+  { calidad: 3, label: "Difícil", color: "bg-orange-500/10 text-orange-400 border-orange-500/20 hover:bg-orange-500/20" },
+  { calidad: 4, label: "Bien", color: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20 hover:bg-yellow-500/20" },
   { calidad: 5, label: "Fácil", color: "bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20" },
 ];
 
 export default function SesionRepaso({ tarjetas, onTerminado }: Props) {
-  const [indice, setIndice] = useState(0);
+  // Cola de la sesión: las falladas vuelven al final para repasarlas hoy
+  const [cola, setCola] = useState<Flashcard[]>(tarjetas);
+  // Tarjetas ya puntuadas hoy en el servidor (los reintentos no vuelven a tocar el SM-2)
+  const [puntuadas, setPuntuadas] = useState<Set<number>>(() => new Set());
+  const [repasadas, setRepasadas] = useState(0);
   const [revelada, setRevelada] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  if (tarjetas.length === 0 || indice >= tarjetas.length) {
+  const tarjeta = cola[0];
+
+  if (!tarjeta) {
     return (
       <div className="flex flex-col items-center gap-6 py-12 text-center animate-fade-in-up">
         <div className="inline-flex rounded-2xl bg-green-500/10 p-5">
@@ -41,7 +52,7 @@ export default function SesionRepaso({ tarjetas, onTerminado }: Props) {
         <div>
           <h2 className="text-xl font-bold">¡Sesión completada!</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Has repasado {tarjetas.length} tarjeta{tarjetas.length !== 1 ? "s" : ""}.
+            Has repasado {repasadas} tarjeta{repasadas !== 1 ? "s" : ""}.
           </p>
         </div>
         <button
@@ -55,26 +66,44 @@ export default function SesionRepaso({ tarjetas, onTerminado }: Props) {
     );
   }
 
-  const tarjeta = tarjetas[indice];
-  const progreso = ((indice) / tarjetas.length) * 100;
+  const total = tarjetas.length;
+  const hechas = total - cola.filter((t) => !puntuadas.has(t.id)).length;
+  const progreso = total > 0 ? (hechas / total) * 100 : 100;
+  const esReintento = puntuadas.has(tarjeta.id);
+
+  const avanzar = (fallada: boolean) => {
+    setRevelada(false);
+    setCola(([actual, ...resto]) => (fallada ? [...resto, actual] : resto));
+  };
 
   const responder = (calidad: number) => {
+    setError(null);
     startTransition(async () => {
-      try {
-        await revisarFlashcard({ id: tarjeta.id, calidad });
-      } catch { /* silencioso */ }
-      setRevelada(false);
-      setIndice((i) => i + 1);
+      if (!esReintento) {
+        try {
+          await revisarFlashcard({ id: tarjeta.id, calidad });
+        } catch {
+          setError("No se pudo guardar el repaso. Comprueba la conexión y vuelve a intentarlo.");
+          return;
+        }
+        setPuntuadas((prev) => new Set(prev).add(tarjeta.id));
+        setRepasadas((n) => n + 1);
+      }
+      avanzar(calidad < 3);
     });
   };
 
   const borrar = () => {
+    if (!window.confirm("¿Eliminar esta tarjeta del mazo? No se puede deshacer.")) return;
+    setError(null);
     startTransition(async () => {
       try {
         await eliminarFlashcard(tarjeta.id);
-      } catch { /* silencioso */ }
-      setRevelada(false);
-      setIndice((i) => i + 1);
+      } catch {
+        setError("No se pudo eliminar la tarjeta.");
+        return;
+      }
+      avanzar(false);
     });
   };
 
@@ -83,7 +112,10 @@ export default function SesionRepaso({ tarjetas, onTerminado }: Props) {
       {/* Progreso */}
       <div className="space-y-2">
         <div className="flex justify-between text-xs text-muted-foreground">
-          <span>{indice + 1} / {tarjetas.length}</span>
+          <span>
+            {Math.min(hechas + 1, total)} / {total}
+            {esReintento && " · repaso de fallada"}
+          </span>
           <span>{tarjeta.asignatura}</span>
         </div>
         <div className="h-1.5 overflow-hidden rounded-full bg-muted">
@@ -95,10 +127,12 @@ export default function SesionRepaso({ tarjetas, onTerminado }: Props) {
       </div>
 
       {/* Tarjeta con efecto flip */}
-      <div
-        className="relative cursor-pointer"
+      <button
+        type="button"
+        className="relative block w-full cursor-pointer text-left"
         style={{ perspective: "1200px" }}
-        onClick={() => !revelada && setRevelada(true)}
+        onClick={() => setRevelada(true)}
+        aria-label={revelada ? "Respuesta visible" : "Mostrar respuesta"}
       >
         <div
           className="relative transition-transform duration-500"
@@ -138,7 +172,13 @@ export default function SesionRepaso({ tarjetas, onTerminado }: Props) {
             <p className="text-base leading-7 text-foreground">{tarjeta.dorso}</p>
           </div>
         </div>
-      </div>
+      </button>
+
+      {error && (
+        <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {error}
+        </p>
+      )}
 
       {/* Botones de calidad */}
       {revelada && (

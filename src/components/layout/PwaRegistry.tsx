@@ -1,19 +1,23 @@
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect } from "react";
 
 export default function PwaRegistry() {
   useEffect(() => {
-    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+    if (!("serviceWorker" in navigator)) return;
+
+    if (process.env.NODE_ENV !== "production") {
+      // En desarrollo un SW cacheando assets da problemas: fuera
       navigator.serviceWorker
-        .register('/sw.js')
-        .then((registration) => {
-          console.log('Service Worker registrado correctamente');
-        })
-        .catch((err) => {
-          console.log('Error registrando Service Worker: ', err);
-        });
+        .getRegistrations()
+        .then((registros) => registros.forEach((r) => r.unregister()))
+        .catch(() => {});
+      return;
     }
+
+    navigator.serviceWorker.register("/sw.js").catch((err) => {
+      console.error("Error registrando el Service Worker:", err);
+    });
   }, []);
 
   return null;

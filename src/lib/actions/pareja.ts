@@ -1,67 +1,55 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
-async function getSupabaseAndUser() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("No autenticado.");
-  return { supabase, userId: user.id };
-}
+import { requireUser } from "@/lib/auth";
+import { hoyMadrid } from "@/lib/utils";
+
+const IdSchema = z.number().int().positive();
 
 export async function desbloquearHito(hitoId: number) {
-  const { supabase, userId } = await getSupabaseAndUser();
+  const { supabase, user } = await requireUser();
 
-  const updateData = {
-    desbloqueado: true,
-    fecha_desbloqueo: new Date().toISOString().split("T")[0],
-  } as never;
   const { error } = await supabase
     .from("hitos_pareja")
-    .update(updateData)
-    .eq("id", hitoId)
-    .eq("user_id", userId);
+    .update({ desbloqueado: true, fecha_desbloqueo: hoyMadrid() })
+    .eq("id", IdSchema.parse(hitoId))
+    .eq("user_id", user.id);
 
   if (error) throw new Error("No se pudo actualizar el hito.");
   revalidatePath("/pareja");
 }
 
 export async function bloquearHito(hitoId: number) {
-  const { supabase, userId } = await getSupabaseAndUser();
+  const { supabase, user } = await requireUser();
 
-  const updateData = { desbloqueado: false, fecha_desbloqueo: null } as never;
   const { error } = await supabase
     .from("hitos_pareja")
-    .update(updateData)
-    .eq("id", hitoId)
-    .eq("user_id", userId);
+    .update({ desbloqueado: false, fecha_desbloqueo: null })
+    .eq("id", IdSchema.parse(hitoId))
+    .eq("user_id", user.id);
 
   if (error) throw new Error("No se pudo actualizar el hito.");
   revalidatePath("/pareja");
 }
 
 export async function guardarNota(contenido: string) {
-  const { supabase, userId } = await getSupabaseAndUser();
+  const texto = z.string().max(2000, "La nota no puede superar 2000 caracteres.").parse(contenido);
+  const { supabase, user } = await requireUser();
 
-  const upsertData: any = { user_id: userId, contenido, updated_at: new Date().toISOString() };
   const { error } = await supabase
     .from("nota_pareja")
-    .upsert(upsertData);
+    .upsert({ user_id: user.id, contenido: texto, updated_at: new Date().toISOString() });
 
   if (error) throw new Error("No se pudo guardar la nota.");
   revalidatePath("/pareja");
 }
 
 export async function inicializarHitos() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (user) {
-    await supabase.rpc("inicializar_hitos_pareja", { p_user_id: user.id } as any);
-  }
+  const { supabase } = await requireUser();
+
+  const { error } = await supabase.rpc("inicializar_hitos_pareja");
+  if (error) throw new Error("No se pudieron crear los hitos.");
   revalidatePath("/pareja");
 }

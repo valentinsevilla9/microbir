@@ -1,49 +1,59 @@
 "use server";
 
-import { generarFlashcardDesdeTexto } from "@/lib/ai";
-import { createClient } from "@/lib/supabase/server";
+import { z } from "zod";
 
-export async function processTextToFlashcard(texto: string) {
-  try {
-    // 1. Llamar a la IA (Intenta Gemini, si falla usa Groq)
-    const flashcard = await generarFlashcardDesdeTexto(texto);
-    
-    return {
-      success: true,
-      data: flashcard
-    };
-  } catch (error: any) {
+import { generarFlashcardDesdeTexto } from "@/lib/ai";
+import { requireUser } from "@/lib/auth";
+import { crearFlashcard } from "@/lib/actions/flashcards";
+import { MAX_TEXTO_FLASHCARD } from "@/lib/utils";
+
+type Resultado<T> = { success: true; data: T } | { success: false; error: string };
+
+const TextoSchema = z.string().trim().min(10).max(MAX_TEXTO_FLASHCARD);
+
+export async function processTextToFlashcard(
+  texto: string
+): Promise<Resultado<{ pregunta: string; respuesta: string }>> {
+  // Sin esto cualquiera podría gastar la cuota de Gemini/Groq
+  await requireUser();
+
+  const parsed = TextoSchema.safeParse(texto);
+  if (!parsed.success) {
     return {
       success: false,
-      error: error.message || "Error procesando el texto con la IA"
+      error: `Selecciona entre 10 y ${MAX_TEXTO_FLASHCARD} caracteres de texto.`,
+    };
+  }
+
+  try {
+    // Intenta Gemini y, si falla, Groq
+    const flashcard = await generarFlashcardDesdeTexto(parsed.data);
+    return { success: true, data: flashcard };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error procesando el texto con la IA",
     };
   }
 }
 
-export async function guardarFlashcardGenerada(pregunta: string, respuesta: string, asignatura: string) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) {
-    return { success: false, error: "No autorizado" };
+export async function guardarFlashcardGenerada(
+  pregunta: string,
+  respuesta: string,
+  asignatura: string
+): Promise<Resultado<null>> {
+  try {
+    await crearFlashcard({ frente: pregunta, dorso: respuesta, asignatura });
+    return { success: true, data: null };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof z.ZodError
+          ? "Revisa la tarjeta: la pregunta admite 1000 caracteres y la respuesta 2000."
+          : error instanceof Error
+            ? error.message
+            : "No se pudo guardar la flashcard.",
+    };
   }
-
-  // La guardamos en la tabla actual de flashcards
-  const insertPayload: any = {
-    user_id: user.id,
-    frente: pregunta, // Se mapea 'pregunta' a 'frente'
-    dorso: respuesta, // Se mapea 'respuesta' a 'dorso'
-    asignatura: asignatura,
-    intervalo: 0,
-    repeticiones: 0,
-    facilidad: 2.5
-  };
-
-  const { error } = await supabase.from("flashcards").insert(insertPayload);
-
-  if (error) {
-    return { success: false, error: error.message };
-  }
-
-  return { success: true };
 }

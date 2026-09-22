@@ -6,7 +6,13 @@ export const metadata: Metadata = {
   description: "Accede a tu plataforma personal de preparación BIR.",
 };
 
-export default function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
+  const { next } = await searchParams;
+
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       {/* Fondo con gradientes */}
@@ -31,7 +37,7 @@ export default function LoginPage() {
 
         {/* Card con formulario */}
         <div className="rounded-2xl border border-border bg-card p-6 shadow-xl">
-          <LoginForm />
+          <LoginForm next={next} />
         </div>
 
         <p className="mt-6 text-center text-xs text-muted-foreground">

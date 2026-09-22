@@ -1,14 +1,15 @@
+import type { Metadata } from "next";
 import Link from "next/link";
-import { getAsignaturas } from "@/lib/questions";
+import { getAniosDisponibles, getAsignaturas } from "@/lib/questions";
+
+export const metadata: Metadata = {
+  title: "Simulacros",
+};
 
 export default async function SimulacrosPage() {
-  // Intentamos cargar las asignaturas para mostrar el conteo
-  let asignaturas: { asignatura: string; total: number }[] = [];
-  try {
-    asignaturas = await getAsignaturas();
-  } catch {
-    // Si Supabase no tiene preguntas aún, lo ignoramos
-  }
+  // Los errores de carga los muestra error.tsx (un try/catch aquí se
+  // tragaría también la redirección al login)
+  const [asignaturas, anios] = await Promise.all([getAsignaturas(), getAniosDisponibles()]);
 
   const totalPreguntas = asignaturas.reduce((acc, a) => acc + a.total, 0);
 
@@ -89,7 +90,7 @@ export default async function SimulacrosPage() {
           </div>
           <h2 className="text-lg font-bold">Simulacro oficial</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            200 preguntas con cronómetro de 4 h 30 min, igual que el examen real.
+            Exámenes reales{anios.length > 0 ? ` (${anios[anios.length - 1].anio}–${anios[0].anio})` : ""} completos, con cronómetro y su duración real.
           </p>
           <div className="mt-4 flex items-center gap-1 text-xs text-amber-400 font-medium">
             Iniciar simulacro

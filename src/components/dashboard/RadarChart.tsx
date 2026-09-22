@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from "react";
 
+import { BLOQUES_BIR } from "@/lib/asignaturas";
+
 interface RadarData {
   asignatura: string;
-  labelCorto: string;
   precision: number;
   intentos: number;
 }
@@ -22,25 +23,13 @@ export default function RadarChart({ data, size = 320, desgloseTemas = {} }: Rad
   
   const [selectedAsignatura, setSelectedAsignatura] = useState<string | null>(null);
 
-  // Nombres completos para las 8 ramas
-  const ASIGNATURAS_ORDEN = [
-    { id: "Fisiología y Anatomía", label: "Fisiología & Anat." },
-    { id: "Inmunología", label: "Inmunología" },
-    { id: "Hematología", label: "Hematología" },
-    { id: "Microbiología y Parasitología", label: "Microbiología & Parasito." },
-    { id: "Bioquímica y Biología Molecular", label: "Bioquímica & Biología Mol." },
-    { id: "Biología Celular e Histología", label: "Bio. Celular e Histología" },
-    { id: "Genética", label: "Genética" },
-    { id: "Estadística y Metodología", label: "Estadística & Metod." },
-  ];
-
-  // Mapear los datos de entrada al orden estricto de 8 ejes
+  // Mapear los datos de entrada al orden estricto de los 8 bloques
   const chartData = useMemo(() => {
-    return ASIGNATURAS_ORDEN.map((cat) => {
+    return BLOQUES_BIR.map((cat) => {
       const match = data.find((d) => d.asignatura === cat.id);
       return {
         asignatura: cat.id,
-        label: cat.label,
+        label: cat.corto,
         precision: match ? match.precision : 0,
         intentos: match ? match.intentos : 0,
       };
@@ -133,6 +122,12 @@ export default function RadarChart({ data, size = 320, desgloseTemas = {} }: Rad
               textAnchor={textAnchor}
               alignmentBaseline="middle"
               onClick={() => setSelectedAsignatura(d.asignatura)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") setSelectedAsignatura(d.asignatura);
+              }}
+              role="button"
+              tabIndex={0}
+              aria-label={`Ver desglose de ${d.asignatura}`}
               className="fill-muted-foreground text-[10px] font-medium tracking-tight select-none sm:text-xs cursor-pointer hover:fill-primary transition-colors"
             >
               <tspan x={x} dy="-0.5em">{d.label}</tspan>
@@ -145,11 +140,12 @@ export default function RadarChart({ data, size = 320, desgloseTemas = {} }: Rad
       </svg>
 
       {/* Desglose por subcategorías (Modal / Caja debajo) */}
-      {selectedAsignatura && desgloseTemas[selectedAsignatura] && (
-        <div className="mt-4 w-full bg-card border border-border rounded-xl p-4 shadow-sm animate-in fade-in slide-in-from-top-2">
+      {selectedAsignatura && (
+        <div className="mt-4 w-full bg-card border border-border rounded-xl p-4 shadow-sm animate-fade-in-up">
           <div className="flex justify-between items-center mb-3">
             <h4 className="font-bold text-sm text-foreground">{selectedAsignatura}</h4>
-            <button 
+            <button
+              type="button"
               onClick={() => setSelectedAsignatura(null)}
               className="text-muted-foreground hover:text-foreground text-xs p-1"
             >
@@ -159,7 +155,7 @@ export default function RadarChart({ data, size = 320, desgloseTemas = {} }: Rad
           
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground mb-2">Desglose de fallos por tema:</p>
-            {Object.entries(desgloseTemas[selectedAsignatura])
+            {Object.entries(desgloseTemas[selectedAsignatura] ?? {})
               .sort(([, fallosA], [, fallosB]) => fallosB - fallosA) // Ordenar de más fallos a menos
               .map(([tema, fallos]) => (
                 <div key={tema} className="flex justify-between items-center bg-muted/50 p-2 rounded-md">
@@ -169,7 +165,7 @@ export default function RadarChart({ data, size = 320, desgloseTemas = {} }: Rad
                   </span>
                 </div>
             ))}
-            {Object.keys(desgloseTemas[selectedAsignatura]).length === 0 && (
+            {Object.keys(desgloseTemas[selectedAsignatura] ?? {}).length === 0 && (
               <p className="text-xs text-green-500 bg-green-500/10 p-2 rounded-md text-center font-medium">
                 ¡Sin fallos registrados en esta asignatura!
               </p>

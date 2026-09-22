@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+
+import StatCard from "@/components/ui/StatCard";
 import SesionRepaso from "./SesionRepaso";
 import CrearFlashcardForm from "./CrearFlashcardForm";
 
@@ -17,22 +20,23 @@ type Vista = "menu" | "repaso" | "crear";
 
 interface Props {
   pendientes: Flashcard[];
+  totalPendientes: number;
   totalTarjetas: number;
 }
 
-export default function AnkiClient({ pendientes, totalTarjetas }: Props) {
+export default function AnkiClient({ pendientes, totalPendientes, totalTarjetas }: Props) {
+  const router = useRouter();
   const [vista, setVista] = useState<Vista>("menu");
 
+  const volverAlMenu = () => {
+    setVista("menu");
+    // Refresca los contadores del servidor sin recargar la página
+    // (una recarga completa reiniciaba el Pomodoro en marcha)
+    router.refresh();
+  };
+
   if (vista === "repaso") {
-    return (
-      <SesionRepaso
-        tarjetas={pendientes}
-        onTerminado={() => {
-          setVista("menu");
-          window.location.reload(); // refresca contadores del server
-        }}
-      />
-    );
+    return <SesionRepaso tarjetas={pendientes} onTerminado={volverAlMenu} />;
   }
 
   if (vista === "crear") {
@@ -48,7 +52,7 @@ export default function AnkiClient({ pendientes, totalTarjetas }: Props) {
           </svg>
           Volver
         </button>
-        <CrearFlashcardForm onCreada={() => setVista("menu")} />
+        <CrearFlashcardForm onCreada={volverAlMenu} />
       </div>
     );
   }
@@ -66,13 +70,14 @@ export default function AnkiClient({ pendientes, totalTarjetas }: Props) {
         />
         <StatCard
           label="Para repasar hoy"
-          valor={pendientes.length}
-          color={pendientes.length > 0 ? "text-primary" : "text-green-400"}
-          bg={pendientes.length > 0 ? "bg-primary/10" : "bg-green-400/10"}
+          valor={totalPendientes}
+          color={totalPendientes > 0 ? "text-primary" : "text-green-400"}
+          bg={totalPendientes > 0 ? "bg-primary/10" : "bg-green-400/10"}
         />
         <StatCard
           label="Nuevas (sin repasar)"
           valor={pendientes.filter((p) => p.repeticiones === 0).length}
+          sub={totalPendientes > pendientes.length ? `de las ${pendientes.length} de esta sesión` : undefined}
           color="text-violet-400"
           bg="bg-violet-400/10"
         />
@@ -97,6 +102,8 @@ export default function AnkiClient({ pendientes, totalTarjetas }: Props) {
             <p className="mt-0.5 text-sm text-muted-foreground">
               {pendientes.length === 0
                 ? "No tienes tarjetas pendientes hoy 🎉"
+                : totalPendientes > pendientes.length
+                ? `${pendientes.length} de ${totalPendientes} tarjetas en esta sesión`
                 : `${pendientes.length} tarjeta${pendientes.length !== 1 ? "s" : ""} para repasar`}
             </p>
           </div>
@@ -129,25 +136,6 @@ export default function AnkiClient({ pendientes, totalTarjetas }: Props) {
           <p>El algoritmo SM-2 calcula cuándo necesitas repasar cada tarjeta para memorizarla con el mínimo esfuerzo. Cuanto mejor la recuerdes, más tiempo pasa hasta el siguiente repaso.</p>
         </div>
       )}
-    </div>
-  );
-}
-
-function StatCard({
-  label,
-  valor,
-  color,
-  bg,
-}: {
-  label: string;
-  valor: number;
-  color: string;
-  bg: string;
-}) {
-  return (
-    <div className={`rounded-2xl p-5 ${bg}`}>
-      <p className={`text-3xl font-bold ${color}`}>{valor}</p>
-      <p className="mt-1 text-xs text-muted-foreground">{label}</p>
     </div>
   );
 }

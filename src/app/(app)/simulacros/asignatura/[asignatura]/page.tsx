@@ -3,20 +3,25 @@ import Link from "next/link";
 import SimuladorTest from "@/components/exam/SimuladorTest";
 import { getPreguntasPorAsignatura } from "@/lib/questions";
 
+/** El segmento puede llegar ya decodificado o no; si trae un "%" suelto, se deja tal cual. */
+function decodificar(valor: string): string {
+  try {
+    return decodeURIComponent(valor);
+  } catch {
+    return valor;
+  }
+}
+
 interface Props {
   params: Promise<{ asignatura: string }>;
 }
 
 export default async function TestPorAsignaturaPage({ params }: Props) {
-  const { asignatura: asignaturaEncoded } = await params;
-  const asignatura = decodeURIComponent(asignaturaEncoded);
+  const { asignatura: asignaturaParam } = await params;
+  const asignatura = decodificar(asignaturaParam);
 
-  let preguntas;
-  try {
-    preguntas = await getPreguntasPorAsignatura(asignatura, 20);
-  } catch {
-    notFound();
-  }
+  const preguntas = await getPreguntasPorAsignatura(asignatura, 20);
+  if (preguntas.length === 0) notFound();
 
   return (
     <div className="space-y-6 py-4 sm:py-8">
@@ -38,6 +43,7 @@ export default async function TestPorAsignaturaPage({ params }: Props) {
         preguntas={preguntas}
         modo="asignatura"
         asignatura={asignatura}
+        claveProgreso={`asignatura-${asignatura}`}
       />
     </div>
   );

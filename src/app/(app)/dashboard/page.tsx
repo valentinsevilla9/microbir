@@ -1,118 +1,89 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
-import { logout } from "@/lib/actions/auth";
-import BotonRescate from "@/components/ui/BotonRescate";
+
 import RadarChart from "@/components/dashboard/RadarChart";
+import TarjetaPomodoro from "@/components/pomodoro/TarjetaPomodoro";
+import BotonRescate from "@/components/ui/BotonRescate";
+import StatCard from "@/components/ui/StatCard";
+import { logout } from "@/lib/actions/auth";
+import { SIN_CLASIFICAR } from "@/lib/asignaturas";
+import { requireUser } from "@/lib/auth";
+import { porcentaje, rachaVigente } from "@/lib/utils";
 
 export const metadata: Metadata = {
-  title: "Inicio — BIR Prep",
+  title: "Inicio",
 };
 
 // ── helpers de datos ────────────────────────────────────────
 
-async function getStats(userId: string) {
-  const supabase = await createClient();
+async function getStats() {
+  const { supabase, user } = await requireUser();
 
-  const [sesiones, racha, fallosTotales, flashcardsPendientes, statsAsigQuery, fallosTemaQuery] =
+  const [sesiones, racha, fallosPendientes, flashcardsPendientes, statsAsig, fallosTema] =
     await Promise.all([
       // Últimas 7 sesiones de estudio
       supabase
         .from("sesiones_estudio")
-        .select("puntuacion, total_preguntas, aciertos, created_at")
-        .eq("user_id", userId)
+        .select("total_preguntas, aciertos")
+        .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(7),
 
-      // Racha actual
       supabase
         .from("rachas")
-        .select("racha_actual, racha_maxima")
-        .eq("user_id", userId)
+        .select("racha_actual, racha_maxima, ultimo_estudio")
+        .eq("user_id", user.id)
         .maybeSingle(),
 
-      // Total de fallos
-      supabase
-        .from("historial_fallos")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", userId),
+      // Preguntas distintas pendientes en la caja (lo mismo que lista /fallos)
+      supabase.rpc("contar_fallos_pendientes"),
 
-      // Flashcards pendientes hoy
-      supabase.rpc("obtener_flashcards_pendientes", {
-        p_user_id: userId,
-        cantidad: 1,
-      } as any),
+      supabase.rpc("contar_flashcards_pendientes"),
 
-      // Stats por asignatura (fallback)
-      supabase
-        .from('sesiones_estudio')
-        .select('asignatura, aciertos, total_preguntas, fallos')
-        .eq('user_id', userId)
-        .eq('modo', 'asignatura')
-        .not('asignatura', 'is', null),
-        
-      // Stats por tema (fallos agrupados)
-      supabase
-        .from('historial_fallos')
-        .select('preguntas(asignatura, tema)')
-        .eq('user_id', userId)
+      // Precisión por asignatura con TODAS las respuestas, no sólo tests por asignatura
+      supabase.rpc("obtener_stats_por_asignatura"),
+
+      // Fallos agregados por tema en la BD (sin traerse todas las filas)
+      supabase.rpc("obtener_fallos_por_tema"),
     ]);
 
-  const ultimasSesiones = (sesiones.data ?? []) as {
-    puntuacion: number;
-    total_preguntas: number;
-    aciertos: number;
-    created_at: string;
-  }[];
-
-  const mediaAciertos =
-    ultimasSesiones.length > 0
-      ? Math.round(
-          (ultimasSesiones.reduce(
-            (acc, s) =>
-              acc + (s.total_preguntas > 0 ? (s.aciertos / s.total_preguntas) * 100 : 0),
-            0
-          ) /
-            ultimasSesiones.length)
-        )
-      : null;
-
-  type StatAsignatura = { asignatura: string; aciertos: number; total: number; fallos: number };
-  const statsMap = new Map<string, StatAsignatura>();
-  const statsAsigData = (statsAsigQuery.data ?? []) as any[];
-  for (const s of statsAsigData) {
-    if (!s.asignatura) continue;
-    const prev = statsMap.get(s.asignatura) ?? { asignatura: s.asignatura, aciertos: 0, total: 0, fallos: 0 };
-    statsMap.set(s.asignatura, {
-      asignatura: s.asignatura,
-      aciertos: prev.aciertos + s.aciertos,
-      total: prev.total + s.total_preguntas,
-      fallos: prev.fallos + s.fallos,
-    });
+  const errores = [sesiones, racha, fallosPendientes, flashcardsPendientes, statsAsig, fallosTema]
+    .map((r) => r.error)
+    .filter(Boolean);
+  if (errores.length > 0) {
+    console.error("Error cargando estadísticas:", errores);
+    throw new Error("No se pudieron cargar tus estadísticas.");
   }
-  const statsPorAsignatura = Array.from(statsMap.values())
-    .map(s => ({ ...s, precision: s.total > 0 ? Math.round((s.aciertos / s.total) * 100) : 0 }))
-    .sort((a, b) => a.precision - b.precision); // worst first
 
-  // Agrupar fallos por tema
+  const ultimasSesiones = sesiones.data ?? [];
+  // Media ponderada: un simulacro de 200 pesa más que un test de 10
+  const mediaAciertos = porcentaje(
+    ultimasSesiones.reduce((acc, s) => acc + s.aciertos, 0),
+    ultimasSesiones.reduce((acc, s) => acc + s.total_preguntas, 0)
+  );
+
+  const statsPorAsignatura = (statsAsig.data ?? [])
+    .filter((s) => s.asignatura !== SIN_CLASIFICAR)
+    .map((s) => ({
+      asignatura: s.asignatura,
+      intentos: s.total,
+      precision: porcentaje(s.aciertos, s.total) ?? 0,
+    }));
+
   const desgloseTemas: Record<string, Record<string, number>> = {};
-  const fallosData = (fallosTemaQuery.data ?? []) as any[];
-  
-  for (const f of fallosData) {
-    const asig = f.preguntas?.asignatura;
-    const tema = f.preguntas?.tema;
-    if (asig && tema) {
-      if (!desgloseTemas[asig]) desgloseTemas[asig] = {};
-      desgloseTemas[asig][tema] = (desgloseTemas[asig][tema] || 0) + 1;
-    }
+  for (const f of fallosTema.data ?? []) {
+    desgloseTemas[f.asignatura] ??= {};
+    desgloseTemas[f.asignatura][f.tema] = f.fallos;
   }
 
   return {
-    rachaActual: ((racha.data as any)?.racha_actual ?? 0) as number,
-    rachaMaxima: ((racha.data as any)?.racha_maxima ?? 0) as number,
+    nombre: user.email?.split("@")[0] ?? "opositora",
+    rachaActual: rachaVigente(racha.data),
+    rachaMaxima: racha.data?.racha_maxima ?? 0,
     mediaAciertos,
-    totalFallos: (fallosTotales.count ?? 0) as number,
-    flashcardsPendientes: ((flashcardsPendientes.data ?? []).length) as number,
+    totalFallos: fallosPendientes.data ?? 0,
+    flashcardsPendientes: flashcardsPendientes.data ?? 0,
     numSesiones: ultimasSesiones.length,
     statsPorAsignatura,
     desgloseTemas,
@@ -121,14 +92,12 @@ async function getStats(userId: string) {
 
 // ── componente ──────────────────────────────────────────────
 
-export default async function DashboardPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+const CLASE_TARJETA =
+  "group relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md hover:border-primary/30";
 
-  const nombre = user?.email?.split("@")[0] ?? "opositora";
-  const stats = await getStats(user!.id);
+export default async function DashboardPage() {
+  const stats = await getStats();
+  const { nombre } = stats;
 
   const modulos = [
     {
@@ -159,7 +128,7 @@ export default async function DashboardPage() {
     {
       href: "/simulacros/oficial",
       label: "Simulacro oficial",
-      desc: "200 preguntas · 4h 30 min · fórmula BIR.",
+      desc: "Exámenes reales completos, cronometrados y con fórmula BIR.",
       icon: (
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="12" r="10"/>
@@ -172,7 +141,10 @@ export default async function DashboardPage() {
     {
       href: "/fallos",
       label: "Caja de Fallos",
-      desc: `${stats.totalFallos} preguntas falladas acumuladas.`,
+      desc:
+        stats.totalFallos > 0
+          ? `${stats.totalFallos} pregunta${stats.totalFallos !== 1 ? "s" : ""} pendiente${stats.totalFallos !== 1 ? "s" : ""} de dominar.`
+          : "Sin preguntas pendientes. ¡Bien!",
       icon: (
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
@@ -196,19 +168,6 @@ export default async function DashboardPage() {
       color: "text-green-400",
       bg: "bg-green-400/10",
     },
-    {
-      href: "/pomodoro",
-      label: "Pomodoro",
-      desc: "Timer 25/5 para sesiones de estudio efectivo.",
-      icon: (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="10"/>
-          <polyline points="12 6 12 12 16 14"/>
-        </svg>
-      ),
-      color: "text-orange-400",
-      bg: "bg-orange-400/10",
-    },
   ];
 
   return (
@@ -218,20 +177,27 @@ export default async function DashboardPage() {
         <div className="flex items-center gap-6">
           <div className="relative w-24 h-24 sm:w-28 sm:h-28 flex-shrink-0 animate-float hidden sm:block">
             {/* Totorito en escritorio */}
-            <img 
-              src="/images/totorito.png" 
-              alt="Totorito Mascota" 
-              className="pixel-art drop-shadow-2xl absolute inset-0 w-full h-full object-contain"
+            <Image
+              src="/images/totorito.png"
+              alt="Totorito Mascota"
+              fill
+              priority
+              sizes="112px"
+              unoptimized // el reescalado de next/image emborronaría el pixel art
+              className="pixel-art drop-shadow-2xl object-contain"
             />
           </div>
           <div>
             <div className="flex items-center gap-3">
               <div className="relative w-12 h-12 flex-shrink-0 animate-float sm:hidden">
-                {/* Totorito en mvil (ms pequeo) */}
-                <img 
-                  src="/images/totorito.png" 
-                  alt="Totorito" 
-                  className="pixel-art drop-shadow-xl absolute inset-0 w-full h-full object-contain"
+                {/* Totorito en móvil (más pequeño) */}
+                <Image
+                  src="/images/totorito.png"
+                  alt="Totorito"
+                  fill
+                  sizes="48px"
+                  unoptimized
+                  className="pixel-art drop-shadow-xl object-contain"
                 />
               </div>
               <div>
@@ -273,9 +239,9 @@ export default async function DashboardPage() {
           bg="bg-primary/10"
         />
         <StatCard
-          label="Fallos guardados"
+          label="Caja de fallos"
           valor={String(stats.totalFallos)}
-          sub="en la Caja de Fallos"
+          sub="preguntas pendientes"
           color="text-red-400"
           bg="bg-red-400/10"
         />
@@ -297,7 +263,7 @@ export default async function DashboardPage() {
               key={mod.href}
               href={mod.href}
               id={`card-${mod.href.replace(/\//g, "-").replace(/^-/, "")}`}
-              className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-md hover:border-primary/30"
+              className={CLASE_TARJETA}
             >
               <div className={`mb-3 inline-flex rounded-xl p-2.5 ${mod.bg}`}>
                 <span className={mod.color}>{mod.icon}</span>
@@ -314,6 +280,7 @@ export default async function DashboardPage() {
               </div>
             </Link>
           ))}
+          <TarjetaPomodoro className={CLASE_TARJETA} />
         </div>
       </section>
 
@@ -322,17 +289,12 @@ export default async function DashboardPage() {
         <section>
           <h2 className="mb-4 text-lg font-semibold">Rendimiento global</h2>
           <div className="rounded-2xl border border-border bg-card p-6 flex flex-col items-center justify-center min-h-[350px]">
-            <RadarChart 
-              data={stats.statsPorAsignatura.map(s => ({
-                asignatura: s.asignatura,
-                labelCorto: s.asignatura, // el chart usa su propio mapeo
-                precision: s.precision,
-                intentos: s.total
-              }))} 
+            <RadarChart
+              data={stats.statsPorAsignatura}
               desgloseTemas={stats.desgloseTemas}
             />
             <p className="mt-4 text-center text-xs text-muted-foreground max-w-sm">
-              Esta gráfica muestra tu porcentaje de aciertos en cada uno de los 8 bloques principales del BIR.
+              Tu porcentaje de aciertos en cada uno de los 8 bloques del BIR, contando todos los tests. Toca un bloque para ver en qué temas fallas más.
             </p>
           </div>
         </section>
@@ -340,35 +302,13 @@ export default async function DashboardPage() {
         <section>
           <h2 className="mb-4 text-lg font-semibold">Rendimiento por asignatura</h2>
           <div className="rounded-2xl border border-border bg-card p-8 text-center">
-            <p className="text-sm text-muted-foreground">Completa tests por asignatura para ver tu rendimiento desglosado.</p>
+            <p className="text-sm text-muted-foreground">Completa algún test para ver tu rendimiento por asignatura.</p>
           </div>
         </section>
       )}
 
       {/* Botón de Rescate flotante */}
       <BotonRescate />
-    </div>
-  );
-}
-
-function StatCard({
-  label,
-  valor,
-  sub,
-  color,
-  bg,
-}: {
-  label: string;
-  valor: string;
-  sub: string;
-  color: string;
-  bg: string;
-}) {
-  return (
-    <div className={`rounded-2xl p-4 ${bg}`}>
-      <p className={`text-2xl font-bold ${color}`}>{valor}</p>
-      <p className="mt-0.5 text-xs font-medium text-foreground">{label}</p>
-      <p className="text-xs text-muted-foreground">{sub}</p>
     </div>
   );
 }

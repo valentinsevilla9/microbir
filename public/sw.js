@@ -1,57 +1,77 @@
-const CACHE_NAME = 'bir-prep-v1';
+/*
+ * Service worker de BIR Prep.
+ *
+ * Sólo cachea recursos estáticos (JS/CSS con hash, iconos, imágenes) y una
+ * página offline. NUNCA las páginas ni los datos: son privados y quedarían
+ * accesibles tras cerrar sesión. Al activarse borra cualquier caché
+ * anterior (la v1 guardaba páginas autenticadas).
+ */
+const CACHE_NAME = 'bir-prep-static-v2';
+const OFFLINE_URL = '/offline.html';
+const PRECACHE = [OFFLINE_URL, '/manifest.json', '/icons/icon-192x192.png', '/icons/icon-512x512.png'];
 
-// Instalación del Service Worker
 self.addEventListener('install', (event) => {
-  self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE)).then(() => self.skipWaiting())
+  );
 });
 
-// Activación y limpieza de cachés antiguas
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
+    caches
+      .keys()
+      .then((nombres) => Promise.all(nombres.filter((n) => n !== CACHE_NAME).map((n) => caches.delete(n))))
+      .then(() => self.clients.claim())
   );
-  event.waitUntil(clients.claim());
 });
 
-// Interceptar peticiones de red (Estrategia: Network First, falling back to cache)
+function esEstatico(url) {
+  return (
+    url.pathname.startsWith('/_next/static/') ||
+    url.pathname.startsWith('/icons/') ||
+    url.pathname.startsWith('/images/')
+  );
+}
+
 self.addEventListener('fetch', (event) => {
-  // Ignorar peticiones a la API de Supabase o extensiones de Chrome
-  if (event.request.url.includes('supabase.co') || event.request.url.startsWith('chrome-extension')) {
+  const { request } = event;
+  if (request.method !== 'GET') return;
+
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+
+  // Navegaciones: siempre red; sin conexión, página offline genérica
+  if (request.mode === 'navigate') {
+    event.respondWith(fetch(request).catch(() => caches.match(OFFLINE_URL)));
     return;
   }
 
-  // Para navegación y assets estáticos, intentar red y si falla usar caché
-  event.respondWith(
-    fetch(event.request)
-      .then((networkResponse) => {
-        // Solo cachear peticiones GET válidas
-        if (event.request.method === 'GET' && networkResponse.status === 200) {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-        }
-        return networkResponse;
-      })
-      .catch(async () => {
-        const cachedResponse = await caches.match(event.request);
-        if (cachedResponse) {
-          return cachedResponse;
-        }
-        // Si no hay red ni caché, devolvemos un fallo gracioso (se podría devolver un offline.html)
-        return new Response('Estás sin conexión a internet y esta página no está en caché.', {
-          status: 503,
-          statusText: 'Service Unavailable',
-          headers: new Headers({ 'Content-Type': 'text/plain' })
-        });
-      })
+  // Estáticos con hash: caché primero (no cambian nunca)
+  if (esEstatico(url)) {
+    event.respondWith(
+      caches.match(request).then(
+        (cacheada) =>
+          cacheada ||
+          fetch(request).then((respuesta) => {
+            if (respuesta.ok) {
+              const copia = respuesta.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(request, copia));
+            }
+            return respuesta;
+          })
+      )
+    );
+  }
+  // Todo lo demás (RSC, API, datos): directo a la red, sin cachear
+});
+
+// Al tocar una notificación del Pomodoro, volver a la app
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((ventanas) => {
+      const abierta = ventanas.find((v) => 'focus' in v);
+      return abierta ? abierta.focus() : self.clients.openWindow('/dashboard');
+    })
   );
 });

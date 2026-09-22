@@ -1,23 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { crearFlashcard } from "@/lib/actions/flashcards";
 
-const ASIGNATURAS = [
-  "Biología celular",
-  "Biología molecular",
-  "Genética",
-  "Bioquímica",
-  "Microbiología",
-  "Parasitología",
-  "Inmunología",
-  "Fisiología",
-  "Histología",
-  "Ecología",
-  "Estadística",
-  "Anatomía",
-  "General",
-];
+import { crearFlashcard } from "@/lib/actions/flashcards";
+import { ASIGNATURA_GENERAL, ASIGNATURAS_FLASHCARD } from "@/lib/asignaturas";
 
 interface Props {
   onCreada: () => void;
@@ -26,7 +12,7 @@ interface Props {
 export default function CrearFlashcardForm({ onCreada }: Props) {
   const [frente, setFrente] = useState("");
   const [dorso, setDorso] = useState("");
-  const [asignatura, setAsignatura] = useState("General");
+  const [asignatura, setAsignatura] = useState(ASIGNATURA_GENERAL);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -39,8 +25,8 @@ export default function CrearFlashcardForm({ onCreada }: Props) {
         setFrente("");
         setDorso("");
         onCreada();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Error al crear la tarjeta.");
+      } catch {
+        setError("No se pudo crear la tarjeta. Revisa la longitud (pregunta ≤ 1000, respuesta ≤ 2000 caracteres) y la conexión.");
       }
     });
   };
@@ -50,10 +36,12 @@ export default function CrearFlashcardForm({ onCreada }: Props) {
       <h2 className="text-base font-semibold">Nueva tarjeta</h2>
 
       <div className="space-y-1">
-        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        <label htmlFor="flashcard-frente" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
           Frente (pregunta)
         </label>
         <textarea
+          id="flashcard-frente"
+          maxLength={1000}
           value={frente}
           onChange={(e) => setFrente(e.target.value)}
           required
@@ -64,10 +52,12 @@ export default function CrearFlashcardForm({ onCreada }: Props) {
       </div>
 
       <div className="space-y-1">
-        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        <label htmlFor="flashcard-dorso" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
           Dorso (respuesta)
         </label>
         <textarea
+          id="flashcard-dorso"
+          maxLength={2000}
           value={dorso}
           onChange={(e) => setDorso(e.target.value)}
           required
@@ -78,15 +68,16 @@ export default function CrearFlashcardForm({ onCreada }: Props) {
       </div>
 
       <div className="space-y-1">
-        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        <label htmlFor="flashcard-asignatura" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
           Asignatura
         </label>
         <select
+          id="flashcard-asignatura"
           value={asignatura}
           onChange={(e) => setAsignatura(e.target.value)}
           className="w-full rounded-xl border border-border bg-muted px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
         >
-          {ASIGNATURAS.map((a) => (
+          {ASIGNATURAS_FLASHCARD.map((a) => (
             <option key={a} value={a}>{a}</option>
           ))}
         </select>

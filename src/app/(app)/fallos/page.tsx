@@ -1,20 +1,23 @@
+import type { Metadata } from "next";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
-import { getPreguntasDeFallos } from "@/lib/questions";
-import SimuladorTest from "@/components/exam/SimuladorTest";
-import type { ResumenFallo } from "@/types/database.types";
 
-export const metadata = {
-  title: "Caja de Fallos — BIR Prep",
+import BotonResolverFallo from "@/components/fallos/BotonResolverFallo";
+import SimuladorTest from "@/components/exam/SimuladorTest";
+import { requireUser } from "@/lib/auth";
+import { getPreguntasDeFallos } from "@/lib/questions";
+
+export const metadata: Metadata = {
+  title: "Caja de Fallos",
 };
 
-async function getResumenFallos(userId: string): Promise<ResumenFallo[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("obtener_resumen_fallos", {
-    p_user_id: userId,
-  } as any);
-  if (error) return [];
-  return (data ?? []) as ResumenFallo[];
+async function getResumenFallos() {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase.rpc("obtener_resumen_fallos");
+  if (error) {
+    console.error("Error cargando la caja de fallos:", error);
+    throw new Error("No se pudo cargar la caja de fallos.");
+  }
+  return data ?? [];
 }
 
 interface Props {
@@ -25,27 +28,9 @@ export default async function FallosPage({ searchParams }: Props) {
   const { modo } = await searchParams;
   const enModoTest = modo === "test";
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return (
-      <div className="rounded-2xl border border-border bg-card p-12 text-center">
-        <p className="text-muted-foreground">Debes iniciar sesión.</p>
-      </div>
-    );
-  }
-
   // Modo test: cargamos preguntas de fallos y mostramos el simulador
   if (enModoTest) {
-    let preguntas: import("@/types/exam").PreguntaPublica[];
-    try {
-      preguntas = await getPreguntasDeFallos(40);
-    } catch {
-      preguntas = [];
-    }
+    const preguntas = await getPreguntasDeFallos(40);
     return (
       <div className="space-y-6 py-4 sm:py-8">
         <header className="mx-auto w-full max-w-3xl flex items-center gap-3">
@@ -59,13 +44,13 @@ export default async function FallosPage({ searchParams }: Props) {
             Caja de Fallos
           </Link>
         </header>
-        <SimuladorTest preguntas={preguntas} modo="fallos" />
+        <SimuladorTest preguntas={preguntas} modo="fallos" claveProgreso="fallos" />
       </div>
     );
   }
 
   // Vista normal: lista de fallos
-  const fallos = await getResumenFallos(user.id);
+  const fallos = await getResumenFallos();
 
   return (
     <div className="space-y-8">
@@ -74,8 +59,8 @@ export default async function FallosPage({ searchParams }: Props) {
           <h1 className="text-3xl font-bold tracking-tight">Caja de Fallos</h1>
           <p className="mt-2 text-muted-foreground">
             {fallos.length === 0
-              ? "Aún no has fallado ninguna pregunta. ¡Sigue así!"
-              : `${fallos.length} pregunta${fallos.length !== 1 ? "s" : ""} fallada${fallos.length !== 1 ? "s" : ""} acumuladas.`}
+              ? "No tienes preguntas pendientes. ¡Sigue así!"
+              : `${fallos.length} pregunta${fallos.length !== 1 ? "s" : ""} pendiente${fallos.length !== 1 ? "s" : ""}. Salen de la caja cuando las aciertas.`}
           </p>
         </div>
         {fallos.length > 0 && (
@@ -100,9 +85,9 @@ export default async function FallosPage({ searchParams }: Props) {
               <polyline points="22 4 12 14.01 9 11.01"/>
             </svg>
           </div>
-          <p className="text-lg font-semibold">¡Sin fallos registrados!</p>
+          <p className="text-lg font-semibold">¡Caja vacía!</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Empieza un simulacro para comenzar a registrar errores.
+            Las preguntas que falles en los tests aparecerán aquí hasta que las aciertes.
           </p>
           <Link
             href="/simulacros"
@@ -142,6 +127,8 @@ export default async function FallosPage({ searchParams }: Props) {
                     </span>
                   </div>
                 </div>
+
+                <BotonResolverFallo preguntaId={fallo.pregunta_id} />
               </div>
             );
           })}

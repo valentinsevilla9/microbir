@@ -30,30 +30,38 @@ interface Props {
 export default function ParejaClient({ hitos, notaInicial, stats, sinHitos }: Props) {
   const [nota, setNota] = useState(notaInicial);
   const [notaGuardada, setNotaGuardada] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const handleDesbloquear = (id: number, desbloqueado: boolean) => {
+  /** Ejecuta una acción mostrando un error legible si falla. */
+  const ejecutar = (accion: () => Promise<void>, mensajeError: string) => {
+    setError(null);
     startTransition(async () => {
-      if (desbloqueado) {
-        await bloquearHito(id);
-      } else {
-        await desbloquearHito(id);
+      try {
+        await accion();
+      } catch {
+        setError(mensajeError);
       }
     });
   };
 
+  const handleDesbloquear = (id: number, desbloqueado: boolean) => {
+    ejecutar(
+      () => (desbloqueado ? bloquearHito(id) : desbloquearHito(id)),
+      "No se pudo actualizar el hito."
+    );
+  };
+
   const handleGuardarNota = () => {
-    startTransition(async () => {
+    ejecutar(async () => {
       await guardarNota(nota);
       setNotaGuardada(true);
       setTimeout(() => setNotaGuardada(false), 2000);
-    });
+    }, "No se pudo guardar la nota.");
   };
 
   const handleInicializar = () => {
-    startTransition(async () => {
-      await inicializarHitos();
-    });
+    ejecutar(() => inicializarHitos(), "No se pudieron crear los hitos.");
   };
 
   const desbloquead = hitos.filter((h) => h.desbloqueado).length;
@@ -61,6 +69,11 @@ export default function ParejaClient({ hitos, notaInicial, stats, sinHitos }: Pr
 
   return (
     <div className="space-y-8 animate-fade-in-up">
+      {error && (
+        <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {error}
+        </p>
+      )}
 
       {/* STATS RÁPIDAS */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -86,6 +99,8 @@ export default function ParejaClient({ hitos, notaInicial, stats, sinHitos }: Pr
           value={nota}
           onChange={(e) => setNota(e.target.value)}
           rows={4}
+          maxLength={2000}
+          aria-label="Nota de ánimo"
           placeholder="Eres la persona más increíble que conozco. Cada día que estudias me llena de orgullo. ¡Tú puedes! 💙"
           className="w-full resize-none rounded-xl border border-border bg-muted px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary placeholder:text-muted-foreground/40"
         />
@@ -114,7 +129,7 @@ export default function ParejaClient({ hitos, notaInicial, stats, sinHitos }: Pr
           <div>
             <h2 className="font-semibold">Hitos desbloqueados</h2>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              {desbloquead} de {hitos.length} conseguidos · {porcentaje}%
+              {desbloquead} de {hitos.length} conseguidos · {porcentaje}% · se desbloquean solos al conseguirlos
             </p>
           </div>
           {sinHitos && (

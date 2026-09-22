@@ -1,0 +1,203 @@
+anio,numero,asignatura,tema
+2015,2,Fisiología y Anatomía,Sistema Nervioso y Sentidos
+2015,3,Fisiología y Anatomía,Sistema Nervioso y Sentidos
+2015,9,Fisiología y Anatomía,Sistema Nervioso y Sentidos
+2015,10,Fisiología y Anatomía,Endocrino y Reproductor
+2015,12,Fisiología y Anatomía,Sistema Nervioso y Sentidos
+2015,13,Fisiología y Anatomía,Sistema Nervioso y Sentidos
+2015,17,Fisiología y Anatomía,Cardiovascular y Respiratorio
+2015,22,Fisiología y Anatomía,Sistema Nervioso y Sentidos
+2015,26,Fisiología y Anatomía,Cardiovascular y Respiratorio
+2015,29,Fisiología y Anatomía,Cardiovascular y Respiratorio
+2015,32,Fisiología y Anatomía,Renal y Digestivo
+2015,33,Fisiología y Anatomía,Renal y Digestivo
+2015,37,Fisiología y Anatomía,Endocrino y Reproductor
+2015,55,Biología Celular e Histología,Membrana y Tráfico
+2015,58,Biología Celular e Histología,"Orgánulos, Citoesqueleto y Matriz"
+2015,60,Fisiología y Anatomía,Endocrino y Reproductor
+2015,69,Biología Celular e Histología,Membrana y Tráfico
+2015,82,Microbiología y Parasitología,Virología
+2015,84,Microbiología y Parasitología,Virología
+2015,91,Microbiología y Parasitología,Bacteriología
+2015,96,Microbiología y Parasitología,Antimicrobianos y Resistencias
+2015,99,Microbiología y Parasitología,Bacteriología
+2015,122,Inmunología,Inmunidad Innata y Complemento
+2015,130,Inmunología,Inmunidad Adaptativa
+2015,153,Estadística y Metodología,Bioestadística
+2015,158,Microbiología y Parasitología,Parasitología
+2015,163,Biología Celular e Histología,Histología Humana
+2015,164,Biología Celular e Histología,Histología Humana
+2015,178,Genética,Genética Mendeliana y Herencia
+2015,183,Genética,Genética Mendeliana y Herencia
+2015,185,Genética,Genética Mendeliana y Herencia
+2015,193,Bioquímica y Biología Molecular,Metabolismo Energético
+2015,194,Bioquímica y Biología Molecular,"Proteínas, Enzimas y Aminoácidos"
+2015,211,Bioquímica y Biología Molecular,Metabolismo Energético
+2015,220,Bioquímica y Biología Molecular,Procesos Moleculares
+2016,6,Biología Celular e Histología,Histología Humana
+2016,31,Fisiología y Anatomía,Sistema Nervioso y Sentidos
+2016,37,Fisiología y Anatomía,Sistema Nervioso y Sentidos
+2016,39,Fisiología y Anatomía,Sistema Nervioso y Sentidos
+2016,43,Fisiología y Anatomía,Sistema Nervioso y Sentidos
+2016,48,Fisiología y Anatomía,Endocrino y Reproductor
+2016,54,Fisiología y Anatomía,Renal y Digestivo
+2016,60,Fisiología y Anatomía,Cardiovascular y Respiratorio
+2016,61,Fisiología y Anatomía,Cardiovascular y Respiratorio
+2016,87,Microbiología y Parasitología,Antimicrobianos y Resistencias
+2016,99,Microbiología y Parasitología,Antimicrobianos y Resistencias
+2016,105,Microbiología y Parasitología,Bacteriología
+2016,106,Microbiología y Parasitología,Bacteriología
+2016,154,Genética,Genética Mendeliana y Herencia
+2016,161,Genética,Genética Mendeliana y Herencia
+2016,177,Bioquímica y Biología Molecular,Procesos Moleculares
+2016,178,Bioquímica y Biología Molecular,Procesos Moleculares
+2016,179,Bioquímica y Biología Molecular,Procesos Moleculares
+2016,182,Bioquímica y Biología Molecular,Procesos Moleculares
+2016,191,Bioquímica y Biología Molecular,Procesos Moleculares
+2016,195,Bioquímica y Biología Molecular,Metabolismo Energético
+2016,207,Bioquímica y Biología Molecular,Metabolismo Energético
+2016,210,Bioquímica y Biología Molecular,Metabolismo Energético
+2016,222,Microbiología y Parasitología,Parasitología
+2016,223,Microbiología y Parasitología,Parasitología
+2016,224,Microbiología y Parasitología,Parasitología
+2016,225,Microbiología y Parasitología,Parasitología
+2016,234,Fisiología y Anatomía,Renal y Digestivo
+2017,9,Fisiología y Anatomía,Cardiovascular y Respiratorio
+2017,15,Fisiología y Anatomía,Renal y Digestivo
+2017,23,Biología Celular e Histología,Membrana y Tráfico
+2017,25,Fisiología y Anatomía,Sistema Nervioso y Sentidos
+2017,34,Fisiología y Anatomía,Cardiovascular y Respiratorio
+2017,41,Fisiología y Anatomía,Renal y Digestivo
+2017,45,Fisiología y Anatomía,Renal y Digestivo
+2017,80,Fisiología y Anatomía,Endocrino y Reproductor
+2017,102,Inmunología,Inmunidad Innata y Complemento
+2017,113,Bioquímica y Biología Molecular,"Proteínas, Enzimas y Aminoácidos"
+2017,116,Bioquímica y Biología Molecular,Metabolismo Energético
+2017,126,Bioquímica y Biología Molecular,Metabolismo Energético
+2017,127,Bioquímica y Biología Molecular,Metabolismo Energético
+2017,131,Bioquímica y Biología Molecular,Metabolismo Energético
+2017,136,Bioquímica y Biología Molecular,Procesos Moleculares
+2017,142,Bioquímica y Biología Molecular,Técnicas de Biología Molecular
+2017,144,Bioquímica y Biología Molecular,Técnicas de Biología Molecular
+2017,166,Microbiología y Parasitología,Virología
+2017,179,Microbiología y Parasitología,Antimicrobianos y Resistencias
+2017,205,Genética,Citogenética y Alteraciones Cromosómicas
+2017,211,Genética,Genética Mendeliana y Herencia
+2017,224,Genética,Genética de Poblaciones y Evolución
+2017,226,Estadística y Metodología,Bioestadística
+2018,10,Fisiología y Anatomía,Sistema Nervioso y Sentidos
+2018,13,Fisiología y Anatomía,Sistema Nervioso y Sentidos
+2018,25,Fisiología y Anatomía,Cardiovascular y Respiratorio
+2018,26,Fisiología y Anatomía,Cardiovascular y Respiratorio
+2018,35,Fisiología y Anatomía,Renal y Digestivo
+2018,37,Fisiología y Anatomía,Renal y Digestivo
+2018,41,Fisiología y Anatomía,Renal y Digestivo
+2018,44,Biología Celular e Histología,Membrana y Tráfico
+2018,49,Biología Celular e Histología,"Orgánulos, Citoesqueleto y Matriz"
+2018,54,Biología Celular e Histología,"Orgánulos, Citoesqueleto y Matriz"
+2018,57,Biología Celular e Histología,Histología Humana
+2018,84,Inmunología,Inmunidad Adaptativa
+2018,92,Inmunología,Inmunidad Innata y Complemento
+2018,110,Estadística y Metodología,Epidemiología y Diseño de Estudios
+2018,143,Bioquímica y Biología Molecular,Metabolismo Energético
+2018,144,Bioquímica y Biología Molecular,Metabolismo Energético
+2018,148,Bioquímica y Biología Molecular,"Proteínas, Enzimas y Aminoácidos"
+2018,160,Bioquímica y Biología Molecular,Metabolismo Energético
+2018,167,Bioquímica y Biología Molecular,Procesos Moleculares
+2018,168,Bioquímica y Biología Molecular,Procesos Moleculares
+2018,185,Microbiología y Parasitología,Bacteriología
+2018,197,Microbiología y Parasitología,Micología
+2018,208,Bioquímica y Biología Molecular,Metabolismo Energético
+2018,219,Microbiología y Parasitología,Parasitología
+2018,222,Bioquímica y Biología Molecular,Bioquímica Clínica
+2018,229,Fisiología y Anatomía,Cardiovascular y Respiratorio
+2020,12,Fisiología y Anatomía,Cardiovascular y Respiratorio
+2020,13,Fisiología y Anatomía,Cardiovascular y Respiratorio
+2020,20,Hematología,Fisiología y Patología Eritrocitaria
+2020,24,Fisiología y Anatomía,Renal y Digestivo
+2020,29,Fisiología y Anatomía,Cardiovascular y Respiratorio
+2020,33,Biología Celular e Histología,"Ciclo Celular, Mitosis y Apoptosis"
+2020,59,Inmunología,Inmunopatología
+2020,94,Bioquímica y Biología Molecular,Procesos Moleculares
+2020,99,Estadística y Metodología,Epidemiología y Diseño de Estudios
+2020,110,Bioquímica y Biología Molecular,"Proteínas, Enzimas y Aminoácidos"
+2020,115,Fisiología y Anatomía,Endocrino y Reproductor
+2020,177,Fisiología y Anatomía,Cardiovascular y Respiratorio
+2020,182,Estadística y Metodología,Bioestadística
+2021,12,Fisiología y Anatomía,Cardiovascular y Respiratorio
+2021,38,Fisiología y Anatomía,Renal y Digestivo
+2021,42,Fisiología y Anatomía,Sistema Nervioso y Sentidos
+2021,45,Fisiología y Anatomía,Sistema Nervioso y Sentidos
+2021,47,Biología Celular e Histología,Histología Humana
+2021,96,Bioquímica y Biología Molecular,Técnicas de Biología Molecular
+2021,109,Bioquímica y Biología Molecular,Procesos Moleculares
+2021,114,Genética,Genética Mendeliana y Herencia
+2021,127,Estadística y Metodología,Bioestadística
+2021,131,Bioquímica y Biología Molecular,Bioquímica Clínica
+2021,165,Bioquímica y Biología Molecular,Metabolismo Energético
+2021,168,Microbiología y Parasitología,Antimicrobianos y Resistencias
+2021,191,Microbiología y Parasitología,Virología
+2021,197,Microbiología y Parasitología,Parasitología
+2022,2,Fisiología y Anatomía,Sistema Nervioso y Sentidos
+2022,4,Fisiología y Anatomía,Sistema Nervioso y Sentidos
+2022,23,Fisiología y Anatomía,Renal y Digestivo
+2022,33,Fisiología y Anatomía,Renal y Digestivo
+2022,45,Fisiología y Anatomía,Endocrino y Reproductor
+2022,55,Biología Celular e Histología,Membrana y Tráfico
+2022,101,Inmunología,Inmunidad Adaptativa
+2022,102,Inmunología,Inmunopatología
+2022,124,Estadística y Metodología,Bioestadística
+2022,128,Bioquímica y Biología Molecular,Bioquímica Clínica
+2022,156,Bioquímica y Biología Molecular,Metabolismo Energético
+2022,191,Microbiología y Parasitología,Virología
+2023,24,Fisiología y Anatomía,Renal y Digestivo
+2023,42,Biología Celular e Histología,"Ciclo Celular, Mitosis y Apoptosis"
+2023,43,Biología Celular e Histología,Membrana y Tráfico
+2023,45,Biología Celular e Histología,Histología Humana
+2023,46,Biología Celular e Histología,Membrana y Tráfico
+2023,51,Biología Celular e Histología,Membrana y Tráfico
+2023,62,Biología Celular e Histología,Histología Humana
+2023,74,Bioquímica y Biología Molecular,Procesos Moleculares
+2023,82,Bioquímica y Biología Molecular,Procesos Moleculares
+2023,107,Inmunología,Inmunopatología
+2023,123,Estadística y Metodología,Bioestadística
+2023,124,Estadística y Metodología,Bioestadística
+2023,126,Bioquímica y Biología Molecular,Bioquímica Clínica
+2023,145,Bioquímica y Biología Molecular,Bioquímica Clínica
+2023,146,Bioquímica y Biología Molecular,Bioquímica Clínica
+2023,150,Bioquímica y Biología Molecular,Bioquímica Clínica
+2023,156,Fisiología y Anatomía,Renal y Digestivo
+2023,157,Fisiología y Anatomía,Renal y Digestivo
+2023,172,Microbiología y Parasitología,Antimicrobianos y Resistencias
+2023,175,Microbiología y Parasitología,Bacteriología
+2023,200,Microbiología y Parasitología,Parasitología
+2023,207,Bioquímica y Biología Molecular,Metabolismo Energético
+2024,15,Fisiología y Anatomía,Cardiovascular y Respiratorio
+2024,21,Fisiología y Anatomía,Sistema Nervioso y Sentidos
+2024,31,Fisiología y Anatomía,Renal y Digestivo
+2024,35,Fisiología y Anatomía,Renal y Digestivo
+2024,51,Biología Celular e Histología,Membrana y Tráfico
+2024,94,Inmunología,Inmunidad Adaptativa
+2024,104,Genética,Mutaciones y Reparación del ADN
+2024,113,Genética,Genética Mendeliana y Herencia
+2024,119,Genética,Citogenética y Alteraciones Cromosómicas
+2024,140,Bioquímica y Biología Molecular,Bioquímica Clínica
+2024,141,Bioquímica y Biología Molecular,Metabolismo Energético
+2024,143,Bioquímica y Biología Molecular,Bioquímica Clínica
+2024,191,Microbiología y Parasitología,Virología
+2024,197,Microbiología y Parasitología,Antimicrobianos y Resistencias
+2024,199,Microbiología y Parasitología,Parasitología
+2025,2,Fisiología y Anatomía,Sistema Nervioso y Sentidos
+2025,31,Fisiología y Anatomía,Renal y Digestivo
+2025,37,Fisiología y Anatomía,Cardiovascular y Respiratorio
+2025,39,Fisiología y Anatomía,Cardiovascular y Respiratorio
+2025,43,Biología Celular e Histología,Histología Humana
+2025,115,Genética,Mutaciones y Reparación del ADN
+2025,122,Genética,Genética Mendeliana y Herencia
+2025,128,Biología Celular e Histología,Membrana y Tráfico
+2025,134,Bioquímica y Biología Molecular,Metabolismo Energético
+2025,141,Bioquímica y Biología Molecular,Bioquímica Clínica
+2025,163,Microbiología y Parasitología,Bacteriología
+2025,172,Microbiología y Parasitología,Bacteriología
+2025,185,Microbiología y Parasitología,Bacteriología
+2025,199,Microbiología y Parasitología,Parasitología

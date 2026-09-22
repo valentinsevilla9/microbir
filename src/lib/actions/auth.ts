@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
+import { rutaInternaSegura } from "@/lib/utils";
 
 const LoginSchema = z.object({
   email: z.string().email(),
@@ -36,7 +37,9 @@ export async function login(
     return "Email o contraseña incorrectos.";
   }
 
-  redirect("/dashboard");
+  // Vuelve a la página que se pidió antes del login (?next=)
+  const siguiente = formData.get("next");
+  redirect(rutaInternaSegura(typeof siguiente === "string" ? siguiente : null));
 }
 
 export async function logout() {

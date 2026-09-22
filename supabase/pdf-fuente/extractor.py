@@ -9,15 +9,17 @@ Uso:
     python extractor.py
 
 Salida:
-    preguntas_extraidas.csv   → CSV con todas las preguntas
+    preguntas_extraidas.csv   → CSV con todas las preguntas (con su número oficial)
     extractor.log             → log detallado de warnings
+
+Después: `python generar_sql_importacion.py` para actualizar Supabase.
 """
 
 import csv
 import logging
-import os
 import re
 import sys
+import unicodedata
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -28,7 +30,7 @@ logging.basicConfig(
     format="%(levelname)s  %(message)s",
     handlers=[
         logging.StreamHandler(sys.stdout),
-        logging.FileHandler("extractor.log", mode="w", encoding="utf-8"),
+        logging.FileHandler(Path(__file__).parent / "extractor.log", mode="w", encoding="utf-8"),
     ],
 )
 log = logging.getLogger(__name__)
@@ -39,8 +41,12 @@ log = logging.getLogger(__name__)
 BASE_DIR = Path(__file__).parent
 OUTPUT_CSV = BASE_DIR / "preguntas_extraidas.csv"
 
-# Años a procesar (subcarpetas) — solo los que tienen .txt de respuestas
-ANIOS = [2021, 2022, 2023, 2024, 2025]
+# Años a procesar: las subcarpetas con .txt de respuestas (los de 2015–2020
+# se generan con respuestas_pdf_a_txt.py a partir de la plantilla en PDF)
+ANIOS = sorted(
+    int(p.name) for p in BASE_DIR.iterdir()
+    if p.is_dir() and p.name.isdigit() and any(p.glob("*.txt"))
+)
 
 # Mapa de letra → número (posición de respuesta)
 LETRA_A_NUM = {"A": 1, "B": 2, "C": 3, "D": 4}
@@ -52,14 +58,14 @@ LETRA_A_NUM = {"A": 1, "B": 2, "C": 3, "D": 4}
 # Taxonomía BIR (8 Bloques + Subcategorías) con palabras clave ponderadas
 TAXONOMIA_BIR = {
     "Fisiología y Anatomía": {
-        "Cardiovascular y Respiratorio": ["corazón", "cardiaco", "presión arterial", "aorta", "pulmón", "respiratorio", "alveolar", "sístole", "diástole", "capilar", "ventilación", "bronquio"],
-        "Renal y Digestivo": ["renal", "riñón", "nefrona", "orina", "filtración glomerular", "digestivo", "gástrico", "estómago", "intestino", "hepático", "defecación", "absorción intestinal", "bilis"],
-        "Endocrino y Reproductor": ["hormona", "endocrino", "tiroides", "hipófisis", "insulina", "glucagón", "testosterona", "ovario", "espermatozoide", "ovocito", "oxitocina", "somatotropina"],
-        "Sistema Nervioso y Sentidos": ["neurona", "sinapsis", "potencial de acción", "nervio", "cerebro", "simpático", "parasimpático", "ojo", "retina", "oído", "olfato", "axón", "mielina", "receptor"]
+        "Cardiovascular y Respiratorio": ["hematoencefálica", "tensión arterial", "gasto cardiaco", "hemodinámica", "corazón", "cardiaco", "presión arterial", "aorta", "pulmón", "respiratorio", "alveolar", "sístole", "diástole", "capilar", "ventilación", "bronquio"],
+        "Renal y Digestivo": ["alcalosis", "acidosis", "equilibrio ácido-base", "agua corporal", "líquido extracelular", "páncreas", "hígado", "renal", "riñón", "nefrona", "orina", "filtración glomerular", "digestivo", "gástrico", "estómago", "intestino", "hepático", "defecación", "absorción intestinal", "bilis"],
+        "Endocrino y Reproductor": ["testículo", "escroto", "gonadotropina", "diabetes", "embrión", "embrionario", "intrauterino", "placenta", "cortisol", "estrógeno", "progesterona", "inhibina", "glándula", "hormona", "endocrino", "tiroides", "hipófisis", "insulina", "glucagón", "testosterona", "ovario", "espermatozoide", "ovocito", "oxitocina", "somatotropina"],
+        "Sistema Nervioso y Sentidos": ["mielínico", "amielínico", "sonora", "cóclea", "audición", "visión", "potencial de reposo", "músculo", "sarcómero", "neurona", "sinapsis", "potencial de acción", "nervio", "cerebro", "simpático", "parasimpático", "ojo", "retina", "oído", "olfato", "axón", "mielina", "receptor"]
     },
     "Inmunología": {
         "Inmunidad Innata y Complemento": ["innata", "macrófago", "neutrófilo", "complemento", "fagocitosis", "toll-like", "inflamación", "NK", "quimiotaxis"],
-        "Inmunidad Adaptativa": ["linfocito", "anticuerpo", "inmunoglobulina", "CD4", "CD8", "MHC", "HLA", "TCR", "BCR", "citocina", "Th1", "Th2"],
+        "Inmunidad Adaptativa": ["sistema inmune", "inmunitario", "inmunológico", "timo", "vacuna", "antígeno", "linfocito", "anticuerpo", "inmunoglobulina", "CD4", "CD8", "MHC", "HLA", "TCR", "BCR", "citocina", "Th1", "Th2"],
         "Inmunopatología": ["hipersensibilidad", "autoinmune", "alergia", "rechazo", "trasplante", "inmunodeficiencia", "tolerancia", "anafilaxia"],
         "Técnicas Inmunológicas": ["ELISA", "citometría", "inmunofluorescencia", "anticuerpo monoclonal", "hibridoma"]
     },
@@ -70,26 +76,27 @@ TAXONOMIA_BIR = {
         "Banco de Sangre e Inmunohematología": ["grupo sanguíneo", "ABO", "Rh", "transfusión", "Coombs"]
     },
     "Microbiología y Parasitología": {
-        "Bacteriología": ["bacteria", "bacteriano", "Gram", "bacilo", "coco", "estafilococo", "estreptococo", "peptidoglicano", "endospora", "LPS", "tuberculosis"],
+        "Bacteriología": ["agar", "cultivo", "Neisseria", "Escherichia", "Salmonella", "Klebsiella", "Pseudomonas", "Staphylococcus", "Streptococcus", "Mycobacterium", "Clostridium", "Chlamydia", "Treponema", "Haemophilus", "Legionella", "Listeria", "granuloma inguinal", "transmisión sexual", "infección", "bacteria", "bacteriano", "Gram", "bacilo", "coco", "estafilococo", "estreptococo", "peptidoglicano", "endospora", "LPS", "tuberculosis"],
         "Virología": ["virus", "viral", "VIH", "hepatitis", "herpes", "SARS", "bacteriófago", "virión", "cápside"],
         "Micología": ["hongo", "levadura", "cándida", "aspergillus", "micosis", "espora"],
-        "Parasitología": ["parásito", "plasmodium", "leishmania", "trypanosoma", "helminto", "nematodo", "protozoo", "vector"],
+        "Parasitología": ["Enterobius", "Giardia", "Toxoplasma", "Entamoeba", "Taenia", "Ascaris", "Schistosoma", "Trichomonas", "parásito", "plasmodium", "leishmania", "trypanosoma", "helminto", "nematodo", "protozoo", "vector"],
         "Antimicrobianos y Resistencias": ["antibiótico", "penicilina", "resistencia", "betalactámico", "antimicrobiano", "CMI", "CBA"]
     },
     "Bioquímica y Biología Molecular": {
-        "Metabolismo Energético": ["glucólisis", "Krebs", "ATP", "metabolismo", "lípido", "colesterol", "ácido graso", "glucógeno", "NADH", "FADH", "beta-oxidación"],
+        "Metabolismo Energético": ["ácidos grasos", "gluconeogénesis", "cetogénesis", "urea", "amoniaco", "vitamina", "coenzima", "glucólisis", "Krebs", "ATP", "metabolismo", "lípido", "colesterol", "ácido graso", "glucógeno", "NADH", "FADH", "beta-oxidación"],
         "Proteínas, Enzimas y Aminoácidos": ["proteína", "enzima", "aminoácido", "cinética", "Michaelis", "alostérico", "péptido", "km", "Vmax"],
-        "Procesos Moleculares": ["ADN", "ARN", "replicación", "transcripción", "traducción", "polimerasa", "promotor", "operón", "helicasa", "ligasa", "ARNm"],
-        "Técnicas de Biología Molecular": ["PCR", "Western blot", "Southern", "Northern", "secuenciación", "electroforesis", "CRISPR", "clonación", "plásmido"]
+        "Procesos Moleculares": ["nucleótido", "desoxinucleótido", "nucleosoma", "cromatina", "histona", "ADN", "ARN", "replicación", "transcripción", "traducción", "polimerasa", "promotor", "operón", "helicasa", "ligasa", "ARNm"],
+        "Técnicas de Biología Molecular": ["PCR", "Western blot", "Southern", "Northern", "secuenciación", "electroforesis", "CRISPR", "clonación", "plásmido"],
+        "Bioquímica Clínica": ["suero", "sérico", "plasmático", "líquido pleural", "líquido sinovial", "líquido cefalorraquídeo", "cribado", "marcador", "transaminasa", "creatinina", "bilirrubina", "troponina", "glucemia", "hemoglobina glicada", "proteinograma", "albúmina", "sepsis", "procalcitonina"]
     },
     "Biología Celular e Histología": {
         "Membrana y Tráfico": ["membrana plasmática", "endocitosis", "exocitosis", "vesícula", "Golgi", "retículo", "transporte activo", "bomba sodio"],
         "Orgánulos, Citoesqueleto y Matriz": ["mitocondria", "lisosoma", "peroxisoma", "citoesqueleto", "microtúbulo", "actina", "colágeno", "matriz extracelular", "fibroblasto"],
         "Ciclo Celular, Mitosis y Apoptosis": ["ciclo celular", "mitosis", "meiosis", "apoptosis", "ciclina", "caspasa", "centrosoma", "cinetocoro"],
-        "Histología Humana": ["tejido", "epitelio", "conjuntivo", "muscular", "nervioso", "cartílago", "óseo", "endotelio", "osteoblasto", "epidermis"]
+        "Histología Humana": ["hueso", "ósea", "osteoclasto", "Paget", "piel", "sebácea", "sudorípara", "tejido", "epitelio", "conjuntivo", "muscular", "nervioso", "cartílago", "óseo", "endotelio", "osteoblasto", "epidermis"]
     },
     "Genética": {
-        "Genética Mendeliana y Herencia": ["Mendel", "herencia", "alelo", "dominante", "recesivo", "autosómico", "ligado al sexo", "pedigrí", "fenotipo", "genotipo"],
+        "Genética Mendeliana y Herencia": ["gen supresor", "oncogén", "poliposis", "síndrome de", "hereditario", "Mendel", "herencia", "alelo", "dominante", "recesivo", "autosómico", "ligado al sexo", "pedigrí", "fenotipo", "genotipo"],
         "Citogenética y Alteraciones Cromosómicas": ["cromosoma", "cariotipo", "aneuploidía", "trisomía", "Down", "translocación", "deleción", "cromátida"],
         "Mutaciones y Reparación del ADN": ["mutación", "reparación", "mutágeno", "nonsense", "missense", "frameshift"],
         "Genética de Poblaciones y Evolución": ["Hardy-Weinberg", "población", "evolución", "deriva genética", "selección natural", "polimorfismo"]
@@ -102,27 +109,86 @@ TAXONOMIA_BIR = {
 }
 
 
-def clasificar_pregunta(texto: str) -> tuple[str, str]:
+SIN_CLASIFICAR = "Sin clasificar"
+
+
+def _normalizar(texto: str) -> str:
+    """Minúsculas y sin tildes, para comparar palabras clave."""
+    texto = unicodedata.normalize("NFD", texto.lower())
+    return "".join(c for c in texto if unicodedata.category(c) != "Mn")
+
+
+def _patron_keyword(kw: str) -> re.Pattern:
     """
-    Intenta asignar asignatura y tema (subcategoría) por palabras clave usando un sistema de puntuación.
-    Devuelve: (asignatura, tema). Si no encaja, devuelve ('Fisiología y Anatomía', 'General').
+    Palabras cortas: palabra exacta ("ojo" no casa con "rojo").
+    Palabras largas: prefijo de palabra ("neurona" casa con "neuronas").
     """
-    texto_lower = texto.lower()
-    
-    mejor_asignatura = "Fisiología y Anatomía"
-    mejor_tema = "General"
+    kw_norm = re.escape(_normalizar(kw))
+    if len(kw) >= 5:
+        return re.compile(rf"\b{kw_norm}")
+    return re.compile(rf"\b{kw_norm}\b")
+
+
+_PATRONES = {
+    asignatura: {
+        tema: [_patron_keyword(kw) for kw in keywords]
+        for tema, keywords in temas.items()
+    }
+    for asignatura, temas in TAXONOMIA_BIR.items()
+}
+
+
+def clasificar_pregunta(enunciado: str, opciones: list[str]) -> tuple[str, str | None]:
+    """
+    Asigna asignatura y tema por palabras clave. Las coincidencias en el
+    enunciado pesan el doble que en las opciones.
+    Si nada encaja devuelve (SIN_CLASIFICAR, None) en lugar de inventarse
+    un bloque.
+    """
+    texto_enunciado = _normalizar(enunciado)
+    texto_opciones = _normalizar(" ".join(opciones))
+
+    mejor = (SIN_CLASIFICAR, None)
     max_score = 0
-    
-    for asignatura, temas in TAXONOMIA_BIR.items():
-        for tema, keywords in temas.items():
-            # Contar cuántas keywords distintas aparecen en el texto
-            score = sum(1 for kw in keywords if kw.lower() in texto_lower)
+
+    for asignatura, temas in _PATRONES.items():
+        for tema, patrones in temas.items():
+            score = sum(
+                2 * bool(p.search(texto_enunciado)) + bool(p.search(texto_opciones))
+                for p in patrones
+            )
             if score > max_score:
                 max_score = score
-                mejor_asignatura = asignatura
-                mejor_tema = tema
-                
-    return mejor_asignatura, mejor_tema
+                mejor = (asignatura, tema)
+
+    return mejor
+
+
+CLASIFICACION_MANUAL = BASE_DIR / "clasificacion_manual.csv"
+
+
+def cargar_clasificacion_manual() -> dict[tuple[int, int], tuple[str, str]]:
+    """
+    Clasificación revisada a mano: {(anio, numero): (asignatura, tema)}.
+    Tiene prioridad sobre las palabras clave, así que sirve también para
+    corregir preguntas mal clasificadas.
+    """
+    if not CLASIFICACION_MANUAL.exists():
+        return {}
+    manual: dict[tuple[int, int], tuple[str, str]] = {}
+    with open(CLASIFICACION_MANUAL, encoding="utf-8") as f:
+        for fila in csv.DictReader(f):
+            asignatura, tema = fila["asignatura"], fila["tema"]
+            if tema not in TAXONOMIA_BIR.get(asignatura, {}):
+                raise ValueError(
+                    f"{CLASIFICACION_MANUAL.name}: '{asignatura} / {tema}' "
+                    f"({fila['anio']}-{fila['numero']}) no existe en TAXONOMIA_BIR"
+                )
+            manual[(int(fila["anio"]), int(fila["numero"]))] = (asignatura, tema)
+    return manual
+
+
+_MANUAL = cargar_clasificacion_manual()
 
 
 # ---------------------------------------------------------------------------
@@ -156,6 +222,26 @@ def parsear_respuestas(ruta: Path) -> dict[int, int | None]:
 # ---------------------------------------------------------------------------
 # Extractor de preguntas desde PDF
 # ---------------------------------------------------------------------------
+MARCAS_PORTADA = ("ANTES DE COMENZAR SU EXAMEN", "ADVERTENCIA IMPORTANTE", "NÚMERO DE MESA")
+
+# Distancia vertical (pt) para considerar que dos caracteres van en la misma
+# línea. 5 junta subíndices ("O2", "CO2") sin mezclar líneas contiguas.
+Y_TOLERANCIA = 5
+
+# Glifos que el PDF no mapea a texto: pdfplumber los devuelve como "(cid:N)".
+# Verificados renderizando la página (¡no son αβ, son γδ!).
+GLIFOS_SIN_TEXTO = {
+    "(cid:2011)": "γ",   # 2015: linfocitos Tγδ
+    "(cid:2012)": "δ",
+    "(cid:3493)": "√",   # 2025: √(p(1−p)/100)
+}
+RE_GLIFO = re.compile(r"\(cid:\d+\)")
+
+
+def _es_portada(texto_pagina: str) -> bool:
+    return sum(marca in texto_pagina for marca in MARCAS_PORTADA) >= 2
+
+
 def extraer_texto_pdf(ruta_pdf: Path) -> str:
     """Extrae el texto completo del PDF usando pdfplumber.
     
@@ -171,15 +257,27 @@ def extraer_texto_pdf(ruta_pdf: Path) -> str:
     texto_paginas: list[str] = []
     with pdfplumber.open(ruta_pdf) as pdf:
         for pagina in pdf.pages:
+            # La portada trae instrucciones numeradas ("2. Compruebe...")
+            # que el parser confundía con la pregunta 1.
+            if _es_portada(pagina.extract_text() or ""):
+                continue
+
             width = pagina.width
             height = pagina.height
+
+            # Fuera el texto girado: en 2018 un pie de página vertical
+            # ("FSE BIOLOGÍA 2018/19" + código de barras) se colaba en la
+            # última pregunta de cada página.
+            pagina = pagina.filter(lambda obj: obj.get("upright", True))
 
             # Extraer las dos columnas separadamente
             col_izq = pagina.crop((0, 0, width / 2, height))
             col_der = pagina.crop((width / 2, 0, width, height))
 
-            texto_izq = col_izq.extract_text() or ""
-            texto_der = col_der.extract_text() or ""
+            # Con la tolerancia por defecto (3) los subíndices y
+            # superíndices salían en una línea aparte: "O y CO inspirados. 2 2"
+            texto_izq = col_izq.extract_text(y_tolerance=Y_TOLERANCIA) or ""
+            texto_der = col_der.extract_text(y_tolerance=Y_TOLERANCIA) or ""
 
             # Concatenar columna izquierda + derecha con separador de línea
             texto_pagina = texto_izq.strip() + "\n" + texto_der.strip()
@@ -193,6 +291,29 @@ def extraer_texto_pdf(ruta_pdf: Path) -> str:
     return texto_total
 
 
+# Líneas de maquetación que no forman parte de ninguna pregunta
+RE_LINEA_RUIDO = re.compile(
+    # "Página: 3", "Pagina: 3" (la tilde se pierde al juntar líneas), "3 de 20", "- 3 -",
+    # y el pie "FSE BIOLOGÍA 2020/21", que al ir centrado se parte entre las
+    # dos columnas en "FSE BIOLOG" + "GÍA 2020/21"
+    r"^(?:P[aá]gina:?(?:\s*\d+)?|\d+\s+de\s+\d+|-?\s*\d+\s*-?"
+    r"|FSE\s+BIOLOG\w*(?:\s+\d{4}/\d{2})?|\w{0,4}ÍA\s+\d{4}/\d{2})$",
+    re.IGNORECASE
+)
+RE_LINEA_NUMERADA = re.compile(r"^(\d{1,4})\.+\s+(.*)$")
+
+
+def _es_numero_corrupto(token: str, esperado: int) -> bool:
+    """
+    Algún PDF trae el número de pregunta con un carácter duplicado por
+    la negrita simulada ("1317.." en lugar de "137.").
+    """
+    objetivo = str(esperado)
+    return len(token) == len(objetivo) + 1 and any(
+        token[:i] + token[i + 1:] == objetivo for i in range(len(token))
+    )
+
+
 def parsear_preguntas_texto(texto: str, anio: int) -> list[dict]:
     """
     Parsea el texto del PDF (ya separado por columnas) y extrae las preguntas.
@@ -204,64 +325,83 @@ def parsear_preguntas_texto(texto: str, anio: int) -> list[dict]:
         3. <opción 3>
         4. <opción 4>
 
+    Es un parser secuencial: sólo acepta la opción k+1 después de la k, y
+    sólo abre una pregunta nueva tras la opción 4 y con un número mayor que
+    el actual. Así un "0." o un "2." dentro de un texto no se confunden con
+    el inicio de otra pregunta.
+
     Devuelve lista de dicts con claves:
         num, enunciado, opcion_1, opcion_2, opcion_3, opcion_4
     """
+    lineas = [l.strip() for l in texto.splitlines()]
+    lineas = [l for l in lineas if l and not RE_LINEA_RUIDO.match(l)]
+
     preguntas: list[dict] = []
+    actual: dict | None = None   # {"num": int, "partes": {campo: [líneas]}, "campo": ...}
 
-    # Eliminar líneas de paginación tipo "- 1 -" o "1 -" o "- 2-"
-    texto = re.sub(r"\n\s*-\s*\d+\s*-?\s*\n", "\n", texto)
-    texto = re.sub(r"\n\s*\d+\s*-\s*\n", "\n", texto)
-
-    # Normalizar: quitar líneas vacías múltiples
-    lineas = [l.strip() for l in texto.splitlines() if l.strip()]
-    texto_limpio = "\n".join(lineas)
-
-    # Patrón: número de pregunta (>= 2 dígitos o precedido por salto), enunciado,
-    # luego 4 opciones numeradas 1. 2. 3. 4.
-    # El lookahead detecta la siguiente pregunta o el fin del texto.
-    patron_pregunta = re.compile(
-        r"(?<!\d)(\d{1,3})\.\s+"         # número de pregunta (no precedido por dígito)
-        r"(.+?)\s+"                        # enunciado (no greedy)
-        r"1\.\s+(.+?)\s+"                 # opción 1
-        r"2\.\s+(.+?)\s+"                 # opción 2
-        r"3\.\s+(.+?)\s+"                 # opción 3
-        r"4\.\s+(.+?)"                    # opción 4
-        r"(?=\s+\d{1,3}\.\s|\Z)",         # lookahead: siguiente pregunta o fin
-        re.DOTALL,
-    )
-
-    for m in patron_pregunta.finditer(texto_limpio):
-        num = int(m.group(1))
-        enunciado = _limpiar(m.group(2))
-        opcion_1 = _limpiar(m.group(3))
-        opcion_2 = _limpiar(m.group(4))
-        opcion_3 = _limpiar(m.group(5))
-        opcion_4 = _limpiar(m.group(6))
-
-        if not enunciado or not all([opcion_1, opcion_2, opcion_3, opcion_4]):
-            log.warning("  Pregunta %d: datos incompletos — se omite.", num)
-            continue
-
-        # Sanity check: las opciones no deberían ser demasiado largas
-        if any(len(op) > 500 for op in [opcion_1, opcion_2, opcion_3, opcion_4]):
-            log.warning("  Pregunta %d: opción demasiado larga, posible error de parseo — se omite.", num)
-            continue
-
+    def cerrar(pregunta: dict) -> None:
+        partes = {k: _limpiar("\n".join(v)) for k, v in pregunta["partes"].items()}
+        campos = ["enunciado", 1, 2, 3, 4]
+        if not all(partes.get(c) for c in campos):
+            log.warning("  [%d] Pregunta %d: datos incompletos — se omite.", anio, pregunta["num"])
+            return
+        if any(len(partes[c]) > 600 for c in (1, 2, 3, 4)):
+            log.warning("  [%d] Pregunta %d: opción demasiado larga, posible error de parseo — se omite.",
+                        anio, pregunta["num"])
+            return
         preguntas.append({
-            "num": num,
-            "enunciado": enunciado,
-            "opcion_1": opcion_1,
-            "opcion_2": opcion_2,
-            "opcion_3": opcion_3,
-            "opcion_4": opcion_4,
+            "num": pregunta["num"],
+            "enunciado": partes["enunciado"],
+            "opcion_1": partes[1],
+            "opcion_2": partes[2],
+            "opcion_3": partes[3],
+            "opcion_4": partes[4],
         })
+
+    for linea in lineas:
+        m = RE_LINEA_NUMERADA.match(linea)
+        n = int(m.group(1)) if m else None
+        resto = m.group(2) if m else linea
+
+        if actual is None:
+            # Esperando la primera pregunta
+            if n is not None and 1 <= n <= 5:
+                actual = {"num": n, "partes": {"enunciado": [resto]}, "campo": "enunciado"}
+            continue
+
+        campo = actual["campo"]
+        siguiente_opcion = 1 if campo == "enunciado" else (campo + 1 if campo < 4 else None)
+
+        if n is not None and n == siguiente_opcion:
+            actual["campo"] = n
+            actual["partes"][n] = [resto]
+        elif n is not None and campo == 4 and (
+            actual["num"] < n <= actual["num"] + 5
+            or _es_numero_corrupto(m.group(1), actual["num"] + 1)
+        ):
+            if not actual["num"] < n <= actual["num"] + 5:
+                n = actual["num"] + 1
+            cerrar(actual)
+            actual = {"num": n, "partes": {"enunciado": [resto]}, "campo": "enunciado"}
+        else:
+            actual["partes"][campo].append(linea)
+
+    if actual is not None:
+        cerrar(actual)
 
     return preguntas
 
 
 def _limpiar(texto: str) -> str:
     """Normaliza espacios y saltos de línea dentro de un fragmento de texto."""
+    # Deshacer el guionado de fin de línea: "nega-\ntivo" → "negativo".
+    # Sólo si sigue una minúscula, para respetar "IL-\n2" o "anti-\nHIV".
+    texto = re.sub(r"([a-záéíóúüñ])-[ \t]*\n\s*([a-záéíóúüñ])", r"\1\2", texto)
+    # Glifos sin texto en el PDF
+    for glifo, caracter in GLIFOS_SIN_TEXTO.items():
+        texto = texto.replace(glifo, caracter)
+    for desconocido in set(RE_GLIFO.findall(texto)):
+        log.warning("  Glifo sin mapear %s en: %s… (añádelo a GLIFOS_SIN_TEXTO)", desconocido, texto[:60])
     # Unir múltiples espacios/saltos en uno solo
     texto = re.sub(r"\s+", " ", texto)
     return texto.strip()
@@ -331,9 +471,11 @@ def procesar_anio(anio: int) -> list[dict]:
             # Anulada: omitir
             continue
 
-        asignatura, tema = clasificar_pregunta(p["enunciado"])
+        opciones = [p["opcion_1"], p["opcion_2"], p["opcion_3"], p["opcion_4"]]
+        asignatura, tema = _MANUAL.get((anio, num)) or clasificar_pregunta(p["enunciado"], opciones)
         filas.append({
             "anio": anio,
+            "numero": num,
             "asignatura": asignatura,
             "tema": tema,
             "enunciado": p["enunciado"],
@@ -371,7 +513,7 @@ def main() -> None:
         sys.exit(1)
 
     columnas = [
-        "anio", "asignatura", "tema", "enunciado",
+        "anio", "numero", "asignatura", "tema", "enunciado",
         "opcion_1", "opcion_2", "opcion_3", "opcion_4",
         "respuesta_correcta",
     ]
@@ -391,11 +533,10 @@ def main() -> None:
     log.info("CSV generado: %s", OUTPUT_CSV)
     log.info("")
     log.info("SIGUIENTE PASO:")
-    log.info("  1. Revisa 'preguntas_extraidas.csv' y ajusta la columna 'asignatura'")
-    log.info("     si el clasificador automático no fue preciso.")
-    log.info("  2. Importa el CSV en Supabase:")
-    log.info("     Dashboard → Table Editor → preguntas → Import CSV")
-    log.info("     (o usa: supabase db push + seed manual)")
+    log.info("  1. Revisa las filas con asignatura '%s' si quieres afinar el clasificador.", SIN_CLASIFICAR)
+    log.info("  2. Genera el SQL de importación (conserva los ids y el historial):")
+    log.info("     python generar_sql_importacion.py")
+    log.info("  3. Ejecuta importar_preguntas.sql en Supabase → SQL Editor.")
 
 
 if __name__ == "__main__":

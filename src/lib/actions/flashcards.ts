@@ -1,34 +1,36 @@
 "use server";
 
 import { z } from "zod";
-import { createClient } from "@/lib/supabase/server";
+
+import { requireUser } from "@/lib/auth";
+import { hoyMadrid, sumarDias } from "@/lib/utils";
 
 // ============================================================
 // Crear flashcard
 // ============================================================
 
 const CrearFlashcardSchema = z.object({
-  frente: z.string().min(1).max(1000),
-  dorso: z.string().min(1).max(2000),
-  asignatura: z.string().min(1).max(100),
+  frente: z.string().trim().min(1).max(1000),
+  dorso: z.string().trim().min(1).max(2000),
+  asignatura: z.string().trim().min(1).max(100),
 });
 
 export async function crearFlashcard(payload: unknown) {
   const datos = CrearFlashcardSchema.parse(payload);
-  const supabase = await createClient();
+  const { supabase, user } = await requireUser();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("No autenticado.");
-
-  const insertData: any = {
+  const { error } = await supabase.from("flashcards").insert({
     user_id: user.id,
     ...datos,
-  };
-  const { error } = await supabase.from("flashcards").insert(insertData);
+  });
 
-  if (error) throw new Error("No se pudo crear la flashcard.");
+  if (error) {
+    console.error("Error creando flashcard:", error);
+    throw new Error("No se pudo crear la flashcard.");
+  }
+
+  // Hito "100 flashcards creadas"
+  await supabase.rpc("evaluar_hitos");
 }
 
 // ============================================================
@@ -36,13 +38,11 @@ export async function crearFlashcard(payload: unknown) {
 // ============================================================
 
 /**
- * Calidad de respuesta SM-2:
- *   5 = perfecta
- *   4 = correcta con leve hesitación
- *   3 = correcta con dificultad
- *   2 = incorrecta, fácil de recordar
- *   1 = incorrecta, difícil
- *   0 = blackout total
+ * Calidad de respuesta SM-2 (botones de la sesión de repaso):
+ *   5 = Fácil
+ *   4 = Bien
+ *   3 = Difícil (correcta, pero con esfuerzo)
+ *   1 = Otra vez (fallo → el intervalo vuelve a 1 día)
  */
 const RevisarFlashcardSchema = z.object({
   id: z.number().int().positive(),
@@ -51,14 +51,8 @@ const RevisarFlashcardSchema = z.object({
 
 export async function revisarFlashcard(payload: unknown) {
   const { id, calidad } = RevisarFlashcardSchema.parse(payload);
-  const supabase = await createClient();
+  const { supabase, user } = await requireUser();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("No autenticado.");
-
-  // Recuperar la tarjeta
   const { data: card, error: fetchError } = await supabase
     .from("flashcards")
     .select("intervalo, facilidad, repeticiones")
@@ -68,12 +62,8 @@ export async function revisarFlashcard(payload: unknown) {
 
   if (fetchError || !card) throw new Error("Flashcard no encontrada.");
 
-  // SM-2
-  let { intervalo, facilidad, repeticiones } = card as {
-    intervalo: number;
-    facilidad: number;
-    repeticiones: number;
-  };
+  let { intervalo, repeticiones } = card;
+  let facilidad = Number(card.facilidad);
 
   if (calidad >= 3) {
     // Respuesta correcta
@@ -93,28 +83,23 @@ export async function revisarFlashcard(payload: unknown) {
     facilidad + 0.1 - (5 - calidad) * (0.08 + (5 - calidad) * 0.02)
   );
 
-  const proximaVez = new Date();
-  proximaVez.setDate(proximaVez.getDate() + intervalo);
-  const proximaVezISO = proximaVez.toISOString().split("T")[0];
-
-  const updateData = {
-    intervalo,
-    facilidad,
-    repeticiones,
-    proxima_vez: proximaVezISO,
-    updated_at: new Date().toISOString(),
-  } as never;
-
   const { error: updateError } = await supabase
     .from("flashcards")
-    .update(updateData)
+    .update({
+      intervalo,
+      facilidad,
+      repeticiones,
+      // Mismo "hoy" que la BD (Europe/Madrid)
+      proxima_vez: sumarDias(hoyMadrid(), intervalo),
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", id)
     .eq("user_id", user.id);
 
-  if (updateError) throw new Error("No se pudo actualizar la flashcard.");
+  if (updateError) throw new Error("No se pudo guardar el repaso.");
 
-  // Actualizar racha de días (silencioso)
-  try { await supabase.rpc("registrar_actividad"); } catch {}
+  const { error: rachaError } = await supabase.rpc("registrar_actividad");
+  if (rachaError) console.error("Error actualizando la racha:", rachaError);
 }
 
 // ============================================================
@@ -122,16 +107,13 @@ export async function revisarFlashcard(payload: unknown) {
 // ============================================================
 
 export async function eliminarFlashcard(id: number) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("No autenticado.");
+  const idValido = z.number().int().positive().parse(id);
+  const { supabase, user } = await requireUser();
 
   const { error } = await supabase
     .from("flashcards")
     .delete()
-    .eq("id", id)
+    .eq("id", idValido)
     .eq("user_id", user.id);
 
   if (error) throw new Error("No se pudo eliminar la flashcard.");

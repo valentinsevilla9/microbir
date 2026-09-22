@@ -1,13 +1,13 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getAsignaturas } from "@/lib/questions";
 
+export const metadata: Metadata = {
+  title: "Por asignatura",
+};
+
 export default async function AsignaturaPage() {
-  let asignaturas: { asignatura: string; total: number }[] = [];
-  try {
-    asignaturas = await getAsignaturas();
-  } catch {
-    // Se mostrará el estado vacío
-  }
+  const asignaturas = await getAsignaturas();
 
   return (
     <div className="space-y-8">
@@ -35,7 +35,7 @@ export default async function AsignaturaPage() {
       {asignaturas.length === 0 ? (
         <div className="rounded-2xl border border-border bg-card p-12 text-center">
           <p className="text-muted-foreground text-sm">
-            No hay preguntas cargadas aún. Importa el CSV generado por el extractor Python.
+            No hay preguntas cargadas aún. Importa las preguntas con supabase/pdf-fuente/generar_sql_importacion.py.
           </p>
         </div>
       ) : (

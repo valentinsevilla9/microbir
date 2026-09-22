@@ -2,165 +2,78 @@
 
 import { z } from "zod";
 
-import { createClient } from "@/lib/supabase/server";
-import { crearResultadoTest } from "@/lib/score";
+import { requireUser } from "@/lib/auth";
+import type { OpcionRespuesta, ResultadoTest } from "@/types/exam";
 
-const RespuestaSchema = z.object({
-  preguntaId: z.coerce.number().int().positive(),
-  respuesta: z.union([
-    z.literal(1),
-    z.literal(2),
-    z.literal(3),
-    z.literal(4),
-    z.null(),
-  ]),
-});
-
-const EnvioTestSchema = z.object({
-  respuestas: z.array(RespuestaSchema).min(1).max(200),
-});
-
-type RespuestaItem = z.infer<typeof RespuestaSchema>;
-
-export async function corregirTest(payload: unknown) {
-  const datos = EnvioTestSchema.parse(payload);
-
-  const supabase = await createClient();
-
-  /* Verificamos la identidad en servidor */
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    throw new Error("Debes iniciar sesión para corregir el test.");
-  }
-
-  /*
-   * Antes de corregir, eliminamos preguntas duplicadas.
-   */
-  const preguntasUnicas: RespuestaItem[] = Array.from(
-    new Map(
-      datos.respuestas.map((r: RespuestaItem) => [r.preguntaId, r])
-    ).values()
-  );
-
-  /* Formato esperado por la función RPC de PostgreSQL */
-  const respuestasRpc = preguntasUnicas.map((r) => ({
-    pregunta_id: r.preguntaId,
-    respuesta: r.respuesta,
-  }));
-
-  /*
-   * La función PostgreSQL obtiene las respuestas correctas y corrige.
-   */
-  const { data: correccionRaw, error: correccionError } =
-    await supabase.rpc("corregir_test", { respuestas: respuestasRpc } as any);
-
-  if (correccionError) {
-    console.error("Error corrigiendo test:", correccionError);
-    throw new Error("No se pudo corregir el test.");
-  }
-
-  const correccion = correccionRaw as {
-    aciertos: number;
-    fallos: number;
-    blancas: number;
-    puntuacion: number;
-  };
-
-  /*
-   * Filtramos las respondidas (no en blanco) para luego
-   * identificar cuáles fueron incorrectas.
-   */
-  const respondidas = preguntasUnicas.filter((r) => r.respuesta !== null);
-
-  if (respondidas.length > 0) {
-    const ids = respondidas.map((r) => r.preguntaId);
-
-    const { data: preguntasData, error: preguntasError } = await supabase
-      .from("preguntas")
-      .select("id, respuesta_correcta")
-      .in("id", ids);
-
-    if (preguntasError) {
-      console.error("Error recuperando soluciones:", preguntasError);
-      throw new Error("No se pudieron registrar los fallos.");
-    }
-
-    const preguntas: Array<{ id: number; respuesta_correcta: number }> =
-      preguntasData ?? [];
-
-    const respuestasCorrectas = new Map(
-      preguntas.map((p) => [p.id, p.respuesta_correcta])
-    );
-
-    const fallosParaGuardar = respondidas
-      .filter((r) => r.respuesta !== respuestasCorrectas.get(r.preguntaId))
-      .map((r) => ({
-        user_id: user.id as string,
-        pregunta_id: r.preguntaId,
-        respuesta_usuario: r.respuesta as 1 | 2 | 3 | 4,
-      }));
-
-    if (fallosParaGuardar.length > 0) {
-      const fallosInsert = fallosParaGuardar as never[];
-      const { error: insertError } = await supabase
-        .from("historial_fallos")
-        .insert(fallosInsert);
-
-      if (insertError) {
-        console.error("Error guardando fallos:", insertError);
-        throw new Error(
-          "El test se corrigió, pero no se pudieron guardar los fallos."
-        );
-      }
-    }
-  }
-
-  return crearResultadoTest({
-    aciertos: correccion.aciertos,
-    fallos: correccion.fallos,
-    blancas: correccion.blancas,
-  });
-}
-
-
-// ============================================================
-// guardarSesion — persiste una sesión completada
-// ============================================================
-
-const GuardarSesionSchema = z.object({
+const FinalizarTestSchema = z.object({
   modo: z.enum(["rapido", "asignatura", "oficial", "fallos"]),
-  asignatura: z.string().nullable().optional(),
-  total_preguntas: z.number().int().positive(),
-  aciertos: z.number().int().min(0),
-  fallos: z.number().int().min(0),
-  blancas: z.number().int().min(0),
-  puntuacion: z.number().int(),
+  asignatura: z.string().max(200).nullable(),
+  respuestas: z
+    .array(
+      z.object({
+        preguntaId: z.number().int().positive(),
+        respuesta: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.null()]),
+      })
+    )
+    .min(1)
+    .max(250),
 });
 
-export async function guardarSesion(payload: unknown) {
-  const datos = GuardarSesionSchema.parse(payload);
+const ResultadoRpcSchema = z.object({
+  sesion_id: z.number(),
+  total_preguntas: z.number(),
+  aciertos: z.number(),
+  fallos: z.number(),
+  blancas: z.number(),
+  puntuacion: z.number(),
+  correctas: z.record(z.string(), z.number().int().min(1).max(4)),
+});
 
-  const supabase = await createClient();
+/**
+ * Corrige el test y guarda respuestas, fallos, sesión y racha en una sola
+ * transacción (RPC `finalizar_test`). La nota la calcula la BD: el
+ * cliente sólo envía qué ha marcado.
+ */
+export async function finalizarTest(
+  payload: unknown
+): Promise<{ ok: true; resultado: ResultadoTest } | { ok: false; error: string }> {
+  // Devolvemos el error en vez de lanzarlo: en producción Next oculta el
+  // mensaje de las excepciones de las server actions.
+  const parsed = FinalizarTestSchema.safeParse(payload);
+  if (!parsed.success) return { ok: false, error: "Las respuestas enviadas no son válidas." };
+  const datos = parsed.data;
+  const { supabase } = await requireUser();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Debes iniciar sesión para guardar la sesión.");
-
-  const insertData: any = {
-    user_id: user.id,
-    ...datos,
-  };
-  const { error } = await supabase.from("sesiones_estudio").insert(insertData);
+  const { data, error } = await supabase.rpc("finalizar_test", {
+    p_modo: datos.modo,
+    p_asignatura: datos.asignatura,
+    p_respuestas: datos.respuestas.map((r) => ({
+      pregunta_id: r.preguntaId,
+      respuesta: r.respuesta,
+    })),
+  });
 
   if (error) {
-    console.error("Error guardando sesión:", error);
-    // No lanzamos error — el test ya se corrigió correctamente
+    console.error("Error corrigiendo test:", error);
+    return {
+      ok: false,
+      error: "No se pudo corregir el test. Tus respuestas siguen guardadas: inténtalo de nuevo.",
+    };
   }
 
-  // Actualizar racha de días (silencioso)
-  try { await supabase.rpc("registrar_actividad"); } catch {}
+  const r = ResultadoRpcSchema.parse(data);
+
+  const resultado: ResultadoTest = {
+    sesionId: r.sesion_id,
+    totalPreguntas: r.total_preguntas,
+    aciertos: r.aciertos,
+    fallos: r.fallos,
+    blancas: r.blancas,
+    puntuacion: r.puntuacion,
+    correctas: Object.fromEntries(
+      Object.entries(r.correctas).map(([id, opcion]) => [Number(id), opcion as OpcionRespuesta])
+    ),
+  };
+
+  return { ok: true, resultado };
 }

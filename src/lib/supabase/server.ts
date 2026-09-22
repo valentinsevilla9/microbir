@@ -29,7 +29,7 @@ export async function createClient() {
             /*
              * Puede ocurrir en un Server Component donde las cookies
              * no sean modificables. La renovación de sesión la realiza
-             * nuestro middleware.
+             * el proxy (src/proxy.ts).
              */
           }
         },

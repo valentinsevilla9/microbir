@@ -15,3 +15,13 @@ pnpm-debug.log*
 
 .vscode/
 .idea/
+# TypeScript
+*.tsbuildinfo
+
+# Supabase CLI (estado local)
+supabase/.temp/
+
+# Extractor de preguntas (artefactos generados)
+supabase/pdf-fuente/extractor.log
+supabase/pdf-fuente/importar_preguntas.sql
+__pycache__/

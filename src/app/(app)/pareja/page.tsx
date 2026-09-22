@@ -1,105 +1,76 @@
 import type { Metadata } from "next";
-import { createClient } from "@/lib/supabase/server";
+
 import ParejaClient from "@/components/pareja/ParejaClient";
+import { requireUser } from "@/lib/auth";
+import { porcentaje, rachaVigente } from "@/lib/utils";
 
 export const metadata: Metadata = {
-  title: "Panel de Pareja — BIR Prep",
+  title: "Panel de Pareja",
   description: "Sigue el progreso de tu opositora y déjale mensajes de ánimo",
 };
 
-async function getDatos(userId: string) {
-  const supabase = await createClient();
-  const [hitosRes, notaRes, rachaRes, sesionesRes] = await Promise.all([
+async function getDatos() {
+  const { supabase, user } = await requireUser();
+  const [hitosRes, notaRes, rachaRes, sesionesRes, flashcardsRes] = await Promise.all([
     supabase
       .from("hitos_pareja")
       .select("id, titulo, descripcion, emoji, desbloqueado, fecha_desbloqueo")
-      .eq("user_id", userId)
+      .eq("user_id", user.id)
       .order("id"),
 
     supabase
       .from("nota_pareja")
       .select("contenido")
-      .eq("user_id", userId)
+      .eq("user_id", user.id)
       .maybeSingle(),
 
     supabase
       .from("rachas")
-      .select("racha_actual, racha_maxima")
-      .eq("user_id", userId)
+      .select("racha_actual, racha_maxima, ultimo_estudio")
+      .eq("user_id", user.id)
       .maybeSingle(),
 
+    // Todas las sesiones (sólo dos columnas): antes limit(50) sin orden
+    // topaba "Tests hechos" en 50 y la media salía de 50 sesiones al azar
     supabase
       .from("sesiones_estudio")
-      .select("aciertos, total_preguntas")
-      .eq("user_id", userId)
-      .limit(50),
+      .select("aciertos, total_preguntas", { count: "exact" })
+      .eq("user_id", user.id),
+
+    supabase
+      .from("flashcards")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id),
   ]);
 
-  const hitos = (hitosRes.data ?? []) as {
-    id: number;
-    titulo: string;
-    descripcion: string | null;
-    emoji: string;
-    desbloqueado: boolean;
-    fecha_desbloqueo: string | null;
-  }[];
+  const error = hitosRes.error ?? notaRes.error ?? rachaRes.error ?? sesionesRes.error ?? flashcardsRes.error;
+  if (error) {
+    console.error("Error cargando el panel de pareja:", error);
+    throw new Error("No se pudo cargar el panel.");
+  }
 
-  const notaContenido: string = (notaRes.data as any)?.contenido ?? "";
-
-  const rachaActual: number = (rachaRes.data as any)?.racha_actual ?? 0;
-  const rachaMaxima: number = (rachaRes.data as any)?.racha_maxima ?? 0;
-
-  const sesiones = (sesionesRes.data ?? []) as {
-    aciertos: number;
-    total_preguntas: number;
-  }[];
-
-  const mediaAciertos =
-    sesiones.length > 0
-      ? Math.round(
-          sesiones.reduce(
-            (acc, s) =>
-              acc + (s.total_preguntas > 0 ? (s.aciertos / s.total_preguntas) * 100 : 0),
-            0
-          ) / sesiones.length
-        )
-      : null;
-
-  // Total flashcards
-  const { count: totalFlashcards } = await supabase
-    .from("flashcards")
-    .select("*", { count: "exact", head: true })
-    .eq("user_id", userId);
+  const hitos = hitosRes.data ?? [];
+  const sesiones = sesionesRes.data ?? [];
 
   return {
     hitos,
-    notaContenido,
+    notaContenido: notaRes.data?.contenido ?? "",
     stats: {
-      rachaActual,
-      rachaMaxima,
-      totalSesiones: sesiones.length,
-      totalFlashcards: totalFlashcards ?? 0,
-      mediaAciertos,
+      rachaActual: rachaVigente(rachaRes.data),
+      rachaMaxima: rachaRes.data?.racha_maxima ?? 0,
+      totalSesiones: sesionesRes.count ?? sesiones.length,
+      totalFlashcards: flashcardsRes.count ?? 0,
+      mediaAciertos: porcentaje(
+        sesiones.reduce((acc, s) => acc + s.aciertos, 0),
+        sesiones.reduce((acc, s) => acc + s.total_preguntas, 0)
+      ),
     },
     sinHitos: hitos.length === 0,
   };
 }
 
 export default async function ParejaPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return (
-      <div className="rounded-2xl border border-border bg-card p-12 text-center">
-        <p className="text-muted-foreground">Debes iniciar sesión.</p>
-      </div>
-    );
-  }
-
-  const { hitos, notaContenido, stats, sinHitos } = await getDatos(user.id);
+  const { hitos, notaContenido, stats, sinHitos } = await getDatos();
 
   return (
     <div className="space-y-6">
