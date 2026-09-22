@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 interface RadarData {
   asignatura: string;
@@ -12,22 +12,26 @@ interface RadarData {
 interface RadarChartProps {
   data: RadarData[];
   size?: number;
+  // Mapa de { asignatura: { tema: fallos } }
+  desgloseTemas?: Record<string, Record<string, number>>;
 }
 
-export default function RadarChart({ data, size = 320 }: RadarChartProps) {
+export default function RadarChart({ data, size = 320, desgloseTemas = {} }: RadarChartProps) {
   const center = size / 2;
-  const radius = center - 50; // Margen para las etiquetas
+  const radius = center - 60; // Margen ampliado para nombres completos
+  
+  const [selectedAsignatura, setSelectedAsignatura] = useState<string | null>(null);
 
-  // Asegurarnos de que siempre hay 8 ejes en el orden correcto
+  // Nombres completos para las 8 ramas
   const ASIGNATURAS_ORDEN = [
-    { id: "Fisiología y Anatomía", corto: "Fisio & Anat" },
-    { id: "Inmunología", corto: "Inmunología" },
-    { id: "Hematología", corto: "Hematología" },
-    { id: "Microbiología y Parasitología", corto: "Micro & Parasito" },
-    { id: "Bioquímica y Biología Molecular", corto: "Bioq & Molecular" },
-    { id: "Biología Celular e Histología", corto: "Bio Cel & Histo" },
-    { id: "Genética", corto: "Genética" },
-    { id: "Estadística y Metodología", corto: "Estadística" },
+    { id: "Fisiología y Anatomía", label: "Fisiología & Anat." },
+    { id: "Inmunología", label: "Inmunología" },
+    { id: "Hematología", label: "Hematología" },
+    { id: "Microbiología y Parasitología", label: "Microbiología & Parasito." },
+    { id: "Bioquímica y Biología Molecular", label: "Bioquímica & Biología Mol." },
+    { id: "Biología Celular e Histología", label: "Bio. Celular e Histología" },
+    { id: "Genética", label: "Genética" },
+    { id: "Estadística y Metodología", label: "Estadística & Metod." },
   ];
 
   // Mapear los datos de entrada al orden estricto de 8 ejes
@@ -35,8 +39,8 @@ export default function RadarChart({ data, size = 320 }: RadarChartProps) {
     return ASIGNATURAS_ORDEN.map((cat) => {
       const match = data.find((d) => d.asignatura === cat.id);
       return {
-        labelCorto: cat.corto,
         asignatura: cat.id,
+        label: cat.label,
         precision: match ? match.precision : 0,
         intentos: match ? match.intentos : 0,
       };
@@ -67,7 +71,7 @@ export default function RadarChart({ data, size = 320 }: RadarChartProps) {
   const gridLevels = [0.2, 0.4, 0.6, 0.8, 1];
 
   return (
-    <div className="relative flex justify-center items-center w-full max-w-sm mx-auto font-sans">
+    <div className="relative flex flex-col justify-center items-center w-full max-w-sm mx-auto font-sans">
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="overflow-visible">
         
         {/* Cuadrícula concéntrica */}
@@ -115,10 +119,8 @@ export default function RadarChart({ data, size = 320 }: RadarChartProps) {
 
         {/* Etiquetas de las asignaturas */}
         {chartData.map((d, i) => {
-          // Empujar la etiqueta un poco más afuera del radio 100%
           const { x, y } = getCoordinates(1.2, i); 
           
-          // Ajustes finos de alineación según el cuadrante
           let textAnchor: "middle" | "start" | "end" = "middle";
           if (x > center + 10) textAnchor = "start";
           if (x < center - 10) textAnchor = "end";
@@ -130,9 +132,10 @@ export default function RadarChart({ data, size = 320 }: RadarChartProps) {
               y={y}
               textAnchor={textAnchor}
               alignmentBaseline="middle"
-              className="fill-muted-foreground text-[10px] font-medium tracking-tight select-none sm:text-xs"
+              onClick={() => setSelectedAsignatura(d.asignatura)}
+              className="fill-muted-foreground text-[10px] font-medium tracking-tight select-none sm:text-xs cursor-pointer hover:fill-primary transition-colors"
             >
-              <tspan x={x} dy="-0.5em">{d.labelCorto}</tspan>
+              <tspan x={x} dy="-0.5em">{d.label}</tspan>
               <tspan x={x} dy="1.2em" className={`font-bold ${d.precision >= 70 ? 'fill-green-500' : d.precision >= 50 ? 'fill-yellow-500' : d.intentos > 0 ? 'fill-red-500' : 'fill-muted-foreground/40'}`}>
                 {d.intentos > 0 ? `${d.precision}%` : "-"}
               </tspan>
@@ -140,6 +143,40 @@ export default function RadarChart({ data, size = 320 }: RadarChartProps) {
           );
         })}
       </svg>
+
+      {/* Desglose por subcategorías (Modal / Caja debajo) */}
+      {selectedAsignatura && desgloseTemas[selectedAsignatura] && (
+        <div className="mt-4 w-full bg-card border border-border rounded-xl p-4 shadow-sm animate-in fade-in slide-in-from-top-2">
+          <div className="flex justify-between items-center mb-3">
+            <h4 className="font-bold text-sm text-foreground">{selectedAsignatura}</h4>
+            <button 
+              onClick={() => setSelectedAsignatura(null)}
+              className="text-muted-foreground hover:text-foreground text-xs p-1"
+            >
+              Cerrar
+            </button>
+          </div>
+          
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground mb-2">Desglose de fallos por tema:</p>
+            {Object.entries(desgloseTemas[selectedAsignatura])
+              .sort(([, fallosA], [, fallosB]) => fallosB - fallosA) // Ordenar de más fallos a menos
+              .map(([tema, fallos]) => (
+                <div key={tema} className="flex justify-between items-center bg-muted/50 p-2 rounded-md">
+                  <span className="text-xs font-medium truncate pr-2" title={tema}>{tema}</span>
+                  <span className="text-xs font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full whitespace-nowrap">
+                    {fallos} fallos
+                  </span>
+                </div>
+            ))}
+            {Object.keys(desgloseTemas[selectedAsignatura]).length === 0 && (
+              <p className="text-xs text-green-500 bg-green-500/10 p-2 rounded-md text-center font-medium">
+                ¡Sin fallos registrados en esta asignatura!
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

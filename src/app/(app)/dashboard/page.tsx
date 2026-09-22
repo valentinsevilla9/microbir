@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 async function getStats(userId: string) {
   const supabase = await createClient();
 
-  const [sesiones, racha, fallosTotales, flashcardsPendientes, statsAsigQuery] =
+  const [sesiones, racha, fallosTotales, flashcardsPendientes, statsAsigQuery, fallosTemaQuery] =
     await Promise.all([
       // Últimas 7 sesiones de estudio
       supabase
@@ -50,6 +50,12 @@ async function getStats(userId: string) {
         .eq('user_id', userId)
         .eq('modo', 'asignatura')
         .not('asignatura', 'is', null),
+        
+      // Stats por tema (fallos agrupados)
+      supabase
+        .from('historial_fallos')
+        .select('preguntas(asignatura, tema)')
+        .eq('user_id', userId)
     ]);
 
   const ultimasSesiones = (sesiones.data ?? []) as {
@@ -88,6 +94,19 @@ async function getStats(userId: string) {
     .map(s => ({ ...s, precision: s.total > 0 ? Math.round((s.aciertos / s.total) * 100) : 0 }))
     .sort((a, b) => a.precision - b.precision); // worst first
 
+  // Agrupar fallos por tema
+  const desgloseTemas: Record<string, Record<string, number>> = {};
+  const fallosData = (fallosTemaQuery.data ?? []) as any[];
+  
+  for (const f of fallosData) {
+    const asig = f.preguntas?.asignatura;
+    const tema = f.preguntas?.tema;
+    if (asig && tema) {
+      if (!desgloseTemas[asig]) desgloseTemas[asig] = {};
+      desgloseTemas[asig][tema] = (desgloseTemas[asig][tema] || 0) + 1;
+    }
+  }
+
   return {
     rachaActual: ((racha.data as any)?.racha_actual ?? 0) as number,
     rachaMaxima: ((racha.data as any)?.racha_maxima ?? 0) as number,
@@ -96,6 +115,7 @@ async function getStats(userId: string) {
     flashcardsPendientes: ((flashcardsPendientes.data ?? []).length) as number,
     numSesiones: ultimasSesiones.length,
     statsPorAsignatura,
+    desgloseTemas,
   };
 }
 
@@ -309,6 +329,7 @@ export default async function DashboardPage() {
                 precision: s.precision,
                 intentos: s.total
               }))} 
+              desgloseTemas={stats.desgloseTemas}
             />
             <p className="mt-4 text-center text-xs text-muted-foreground max-w-sm">
               Esta gráfica muestra tu porcentaje de aciertos en cada uno de los 8 bloques principales del BIR.
